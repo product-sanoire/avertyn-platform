@@ -5,7 +5,7 @@
   --bg:#f4f2ee; --card:#ffffff; --acc:#141312; --onacc:#fff;
   --sig:#b23a2a; --sig-soft:#f6e9e6; --ok:#2f6f52; --ok-soft:#e7f0eb; --warn:#8a6a1f; --warn-soft:#f6efdf;
   --sans:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
-  --disp:'Fraunces',Georgia,'Times New Roman',serif;
+  --disp:'Newsreader',Georgia,'Times New Roman',serif;
   --num:'Space Grotesk',ui-monospace,'SF Mono',Menlo,monospace;
   /* aliases kept so older screens (case workspace, login) render in-brand */
   --serif:var(--disp); --red:var(--sig); --ind:#141312; --gold:#8f8d86; --navy:#6f6d63;
