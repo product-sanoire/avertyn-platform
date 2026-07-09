@@ -4,8 +4,9 @@ import { useRouter } from "next/navigation";
 import { supabase } from "../../lib/supabaseClient";
 import { money } from "../../lib/format";
 import { InboxView, TasksView, CalendarView, PredictionsView } from "./ops";
+import { InitiatorsView, DeadlinesView, IntegrationsView } from "./tiera";
 
-const TABS = ["Command center", "Incoming", "Eligibility", "QPA defense", "Respond & pay", "Employer exposure", "Inbox", "Tasks", "Calendar", "Predictions"];
+const TABS = ["Command center", "Incoming", "Eligibility", "QPA defense", "Respond & pay", "Employer exposure", "Inbox", "Tasks", "Calendar", "Predictions", "Initiators", "Deadlines", "Integrations"];
 const mkg = { pass: ["pass", "✓"], fail: ["fail", "×"], warn: ["warn", "!"], na: ["na", "–"] };
 
 // Friendly labels for autonomy action codes.
@@ -247,6 +248,18 @@ export default function Dashboard() {
       ) : tab === 9 ? (
         <div style={{ flex: 1, overflow: "auto", padding: 22 }}>
           <PredictionsView onErr={setErr} onOpen={(id) => { setSel(id); setTab(1); }} />
+        </div>
+      ) : tab === 10 ? (
+        <div style={{ flex: 1, overflow: "auto", padding: 22 }}>
+          <InitiatorsView orgId={orgId} onErr={setErr} />
+        </div>
+      ) : tab === 11 ? (
+        <div style={{ flex: 1, overflow: "auto", padding: 22 }}>
+          <DeadlinesView orgId={orgId} onErr={setErr} />
+        </div>
+      ) : tab === 12 ? (
+        <div style={{ flex: 1, overflow: "auto", padding: 22 }}>
+          <IntegrationsView onErr={setErr} />
         </div>
       ) : (
         <div className="work">
