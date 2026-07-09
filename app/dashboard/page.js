@@ -1,90 +1,219 @@
 "use client";
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "../../lib/supabaseClient";
 import { money } from "../../lib/format";
+import { InboxView, TasksView, CalendarView, PredictionsView } from "./ops";
 
-const TABS = ["Command center", "Incoming", "Eligibility", "QPA defense", "Respond & pay", "Employer exposure"];
+const TABS = ["Command center", "Incoming", "Eligibility", "QPA defense", "Respond & pay", "Employer exposure", "Inbox", "Tasks", "Calendar", "Predictions"];
 const mkg = { pass: ["pass", "✓"], fail: ["fail", "×"], warn: ["warn", "!"], na: ["na", "–"] };
+
+// Friendly labels for autonomy action codes.
+const ACTION_LABEL = {
+  triage: "Triage", defend_qpa: "Defend QPA", challenge_eligibility: "Challenge eligibility",
+  open_negotiation: "Open negotiation", submit_response: "Submit response",
+  submit_additional_info: "Additional info", request_extension: "Request extension",
+  withdraw: "Withdraw", escalate: "Escalate", schedule_payment: "Schedule payment", settle: "Settle",
+};
+const MODES = ["off", "suggest", "review", "auto"];
+const MONEY = new Set(["settle", "schedule_payment"]);
 
 export default function Dashboard() {
   const router = useRouter();
   const [email, setEmail] = useState("");
+  const [userId, setUserId] = useState(null);
   const [orgId, setOrgId] = useState(null);
   const [rows, setRows] = useState([]);
   const [sel, setSel] = useState(null);
   const [detail, setDetail] = useState(null);
   const [metrics, setMetrics] = useState(null);
+  const [score, setScore] = useState(null);      // org_scorecard (PRD success metrics)
+  const [awardsM, setAwardsM] = useState(null);   // awards_metrics
   const [agentM, setAgentM] = useState(null);
   const [scorecard, setScorecard] = useState([]);
+  const [gap, setGap] = useState([]);             // qpa_gap by CPT
+  const [exposure, setExposure] = useState([]);   // employer_exposure_v
   const [queue, setQueue] = useState([]);
   const [feed, setFeed] = useState([]);
+  const [autonomy, setAutonomy] = useState([]);
   const [notifs, setNotifs] = useState(0);
-  const [tab, setTab] = useState(1);
+  const [notifList, setNotifList] = useState([]);
+  const [notifOpen, setNotifOpen] = useState(false);
+  const [docView, setDocView] = useState(null);
+  const [moneyRel, setMoneyRel] = useState(null);
+  const [tab, setTab] = useState(0);
   const [busy, setBusy] = useState("");
   const [verify, setVerify] = useState(null);
+  const [err, setErr] = useState("");
+  const loadedOnce = useRef(false);
 
+  // ---- data loading --------------------------------------------------------
   const loadShell = useCallback(async () => {
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session) { router.push("/login"); return; }
-    setEmail(session.user.email);
-    const { data: me } = await supabase.from("app_users").select("org_id").eq("id", session.user.id).maybeSingle();
-    setOrgId(me?.org_id || null);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) { router.push("/login"); return; }
+      setEmail(session.user.email);
+      setUserId(session.user.id);
+      const { data: me } = await supabase.from("app_users").select("org_id").eq("id", session.user.id).maybeSingle();
+      setOrgId(me?.org_id || null);
 
-    const [{ data: d }, { data: m }, { data: am }, { data: sc }, { data: q }, { data: f }, { count: nc }] = await Promise.all([
-      supabase.from("disputes").select("id, external_ref, cpt_code, demand_amount, qpa_amount, workflow_state, disposition, eligibility_score, respond_by, pay_by, plans(name), initiators(name)").order("respond_by", { ascending: true, nullsFirst: false }),
-      supabase.from("org_metrics").select("*").maybeSingle(),
-      supabase.from("agent_metrics").select("*").maybeSingle(),
-      supabase.from("initiator_scorecard").select("*").order("disputes", { ascending: false }),
-      supabase.from("approval_queue").select("id, dispute_id, action_type, amount, rationale").eq("status", "pending"),
-      supabase.from("action_log").select("action_type, actor, rationale, created_at").order("created_at", { ascending: false }).limit(6),
-      supabase.from("notifications").select("id", { count: "exact", head: true }).eq("read", false),
-    ]);
-    setRows(d || []);
-    setMetrics(m || null); setAgentM(am || null); setScorecard(sc || []);
-    setQueue(q || []); setFeed(f || []); setNotifs(nc || 0);
+      const res = await Promise.all([
+        supabase.from("disputes").select("id, external_ref, cpt_code, demand_amount, qpa_amount, workflow_state, disposition, eligibility_score, respond_by, pay_by, plans(name), initiators(name)").order("respond_by", { ascending: true, nullsFirst: false }),
+        supabase.from("org_metrics").select("*").maybeSingle(),
+        supabase.from("org_scorecard").select("*").maybeSingle(),
+        supabase.from("awards_metrics").select("*").maybeSingle(),
+        supabase.from("agent_metrics").select("*").maybeSingle(),
+        supabase.from("initiator_scorecard").select("*").order("disputes", { ascending: false }),
+        supabase.from("qpa_gap").select("*").order("demand_to_qpa", { ascending: false }).limit(8),
+        supabase.from("employer_exposure_v").select("*").order("at_risk", { ascending: false }),
+        supabase.from("approval_queue").select("id, dispute_id, action_type, amount, rationale").eq("status", "pending"),
+        supabase.from("action_log").select("action_type, actor, rationale, created_at").order("created_at", { ascending: false }).limit(8),
+        supabase.from("autonomy_settings").select("action_type, mode, max_amount"),
+        supabase.from("notifications").select("id, dispute_id, kind, title, body, severity, read, created_at").order("created_at", { ascending: false }).limit(30),
+      ]);
+      const firstErr = res.find((r) => r.error)?.error;
+      if (firstErr) throw firstErr;
+      const [d, m, sc2, aw, am, sc, g, ex, q, f, au, nl] = res.map((r) => r.data);
+      setRows(d || []);
+      setMetrics(m || null); setScore(sc2 || null); setAwardsM(aw || null); setAgentM(am || null);
+      setScorecard(sc || []); setGap(g || []); setExposure(ex || []);
+      setQueue(q || []); setFeed(f || []); setAutonomy(au || []);
+      setNotifList(nl || []); setNotifs((nl || []).filter((n) => !n.read).length);
+      loadedOnce.current = true;
+    } catch (e) {
+      setErr(e.message || "Couldn't load the dashboard.");
+    }
   }, [router]);
+
+  // Light refetch after an action (no heavy list/exposure/gap requeries).
+  const loadOps = useCallback(async () => {
+    try {
+      const res = await Promise.all([
+        supabase.from("org_metrics").select("*").maybeSingle(),
+        supabase.from("org_scorecard").select("*").maybeSingle(),
+        supabase.from("agent_metrics").select("*").maybeSingle(),
+        supabase.from("approval_queue").select("id, dispute_id, action_type, amount, rationale").eq("status", "pending"),
+        supabase.from("action_log").select("action_type, actor, rationale, created_at").order("created_at", { ascending: false }).limit(8),
+        supabase.from("autonomy_settings").select("action_type, mode, max_amount"),
+        supabase.from("notifications").select("id, dispute_id, kind, title, body, severity, read, created_at").order("created_at", { ascending: false }).limit(30),
+      ]);
+      const [m, sc2, am, q, f, au, nl] = res.map((r) => r.data);
+      setMetrics(m || null); setScore(sc2 || null); setAgentM(am || null);
+      setQueue(q || []); setFeed(f || []); setAutonomy(au || []);
+      setNotifList(nl || []); setNotifs((nl || []).filter((n) => !n.read).length);
+    } catch (e) { setErr(e.message); }
+  }, []);
 
   const loadDetail = useCallback(async (id) => {
     if (!id) return;
-    const [{ data: d }, { data: find }, { data: q }] = await Promise.all([
-      supabase.from("disputes").select("*, plans(name), initiators(name)").eq("id", id).single(),
-      supabase.from("eligibility_findings").select("result, detail, eligibility_rules(name, severity)").eq("dispute_id", id),
-      supabase.from("qpa_records").select("*").eq("dispute_id", id).maybeSingle(),
-    ]);
-    setDetail({ d, find: find || [], qpa: q || null });
+    try {
+      const [{ data: d }, { data: find }, { data: q }, { data: docs }, { data: offs }] = await Promise.all([
+        supabase.from("disputes").select("*, plans(name), initiators(name)").eq("id", id).single(),
+        supabase.from("eligibility_findings").select("result, detail, eligibility_rules(name, severity)").eq("dispute_id", id),
+        supabase.from("qpa_records").select("*").eq("dispute_id", id).maybeSingle(),
+        supabase.from("documents").select("id, kind, title, esign_status, signed_by, signed_at, created_at, content").eq("dispute_id", id).order("created_at", { ascending: false }),
+        supabase.from("offers").select("id, party, kind, amount, note, submitted_at").eq("dispute_id", id).order("submitted_at", { ascending: true }),
+      ]);
+      setDetail({ d, find: find || [], qpa: q || null, docs: docs || [], offers: offs || [] });
+    } catch (e) { setErr(e.message); }
   }, []);
 
   useEffect(() => { loadShell(); }, [loadShell]);
   useEffect(() => { if (rows.length && !sel) setSel(rows[0].id); }, [rows, sel]);
   useEffect(() => { if (sel) loadDetail(sel); }, [sel, loadDetail]);
 
-  async function act(name, fn) { setBusy(name); await fn(); await loadShell(); if (sel) await loadDetail(sel); setBusy(""); }
-  const runEngine = () => act("engine", () => supabase.rpc("run_eligibility", { p_dispute: sel }));
-  const runAutopilot = () => act("auto", () => orgId && supabase.rpc("bavert_tick_all", { p_org: orgId }));
-  const release = (id) => act("rel" + id, () => supabase.rpc("release_approval", { p_id: id, p_actor: email }));
-  const reject = (id) => act("rej" + id, () => supabase.rpc("reject_approval", { p_id: id, p_actor: email }));
+  // Realtime: refresh ops slices when the queue, notifications, or ledger move.
+  useEffect(() => {
+    if (!orgId) return;
+    const ch = supabase
+      .channel("avertyn-ops")
+      .on("postgres_changes", { event: "*", schema: "public", table: "approval_queue" }, loadOps)
+      .on("postgres_changes", { event: "*", schema: "public", table: "notifications" }, loadOps)
+      .on("postgres_changes", { event: "*", schema: "public", table: "action_log" }, loadOps)
+      .subscribe();
+    return () => { supabase.removeChannel(ch); };
+  }, [orgId, loadOps]);
+
+  // ---- actions -------------------------------------------------------------
+  async function act(name, fn, opts = {}) {
+    setBusy(name); setErr("");
+    try {
+      await fn();
+      if (opts.full) await loadShell(); else await loadOps();
+      if (sel) await loadDetail(sel);
+    } catch (e) { setErr(e.message || "Action failed."); }
+    setBusy("");
+  }
+  const rpc = async (name, args) => { const { error } = await supabase.rpc(name, args); if (error) throw error; };
+
+  const runEngine = () => act("engine", () => rpc("run_eligibility", { p_dispute: sel }));
+  const runAutopilot = () => act("auto", () => orgId && rpc("bavert_tick_all", { p_org: orgId }));
+  const release = (id) => act("rel" + id, () => rpc("release_approval", { p_id: id, p_actor: email }));
+  const reject = (id) => act("rej" + id, () => rpc("reject_approval", { p_id: id, p_actor: email }));
   const genLetter = () => act("doc", async () => {
-    const { data } = await supabase.rpc("generate_document", { p_dispute: sel, p_kind: "challenge_letter" });
-    if (data) await supabase.rpc("sign_document", { p_doc: data, p_signer: email });
+    const { data, error } = await supabase.rpc("generate_document", { p_dispute: sel, p_kind: "challenge_letter" });
+    if (error) throw error;
+    if (data) { const { error: e2 } = await supabase.rpc("sign_document", { p_doc: data, p_signer: email }); if (e2) throw e2; }
   });
-  const verifyLedger = () => act("verify", async () => { const { data } = await supabase.rpc("verify_ledger", { p_org: orgId }); setVerify(data); });
+  const openNeg = () => act("oneg", async () => {
+    const { data, error } = await supabase.rpc("execute_action", { p_action: "open_negotiation", p_dispute: sel, p_params: {}, p_actor: email, p_rationale: "Open-negotiation offer at 125% of QPA — settle before IDR fees." });
+    if (error) throw error;
+    if (data && data.ok === false) throw new Error(data.reason === "forbidden" ? "Your role can't send offers." : (data.reason || "Couldn't open negotiation."));
+  });
+  const caseAction = (action, rationale) => act("ca_" + action, async () => {
+    const { data, error } = await supabase.rpc("execute_action", { p_action: action, p_dispute: sel, p_params: {}, p_actor: email, p_rationale: rationale });
+    if (error) throw error;
+    if (data && data.ok === false) throw new Error(data.reason === "forbidden" ? "Your role can't do that." : (data.reason || "Action failed."));
+  });
+  const stageMoney = (action, amount, rationale) => act("stage_" + action, async () => {
+    const { data, error } = await supabase.rpc("request_action", { p_action: action, p_dispute: sel, p_amount: amount, p_rationale: rationale });
+    if (error) throw error;
+    if (data && data.ok === false) throw new Error(data.reason === "over_cap" ? `Amount exceeds the ${money(data.cap)} cap.` : (data.reason || "Couldn't stage."));
+  });
+  const releaseMoney = (id, confirmAmount) => act("rel" + id, async () => {
+    const { data, error } = await supabase.rpc("release_money_action", { p_id: id, p_actor: email, p_confirm_amount: confirmAmount, p_stepup: true });
+    if (error) throw error;
+    if (data && data.ok === false) {
+      const map = { maker_cannot_check: "You staged this — a different reviewer must release it.", amount_mismatch: "The amount didn't match.", over_cap: "Over the approval cap.", step_up_required: "Step-up required." };
+      throw new Error(map[data.reason] || data.reason || "Release failed.");
+    }
+  });
+  const setAutonomy_ = (action_type, mode) => act("dial" + action_type, () => rpc("autonomy_set", { p_action_type: action_type, p_mode: mode, p_max_amount: null }));
+  const verifyLedger = () => act("verify", async () => { const { data, error } = await supabase.rpc("verify_ledger", { p_org: orgId }); if (error) throw error; setVerify(data); });
   const exportData = () => act("export", async () => {
-    const { data } = await supabase.rpc("export_org_data", { p_org: orgId });
+    const { data, error } = await supabase.rpc("export_org_data", { p_org: orgId });
+    if (error) throw error;
     const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
     const url = URL.createObjectURL(blob); const a = document.createElement("a");
-    a.href = url; a.download = "bavert-export.json"; a.click(); URL.revokeObjectURL(url);
+    a.href = url; a.download = "avertyn-export.json"; a.click(); URL.revokeObjectURL(url);
   });
+  async function markAllRead() { try { await supabase.rpc("notifications_mark_all_read"); await loadOps(); } catch (e) { setErr(e.message); } }
+  async function openNotif(n) {
+    try { if (!n.read) { await supabase.rpc("notifications_mark_read", { p_ids: [n.id] }); await loadOps(); } } catch (e) { setErr(e.message); }
+    if (n.dispute_id) { setSel(n.dispute_id); setTab(1); }
+    setNotifOpen(false);
+  }
   async function signOut() { await supabase.auth.signOut(); router.push("/login"); }
+
+  // ---- tab filters ---------------------------------------------------------
+  const filtered = (() => {
+    if (tab === 2) return rows.filter((r) => (r.eligibility_score || 0) >= 60 || ["intake", "triage", "eligibility_review"].includes(r.workflow_state));
+    if (tab === 3) return rows.filter((r) => r.workflow_state === "qpa_defense" || r.workflow_state === "response_prep");
+    if (tab === 4) return rows.filter((r) => ["response_prep", "awaiting_determination", "award_payment"].includes(r.workflow_state) || r.disposition === "provider_win");
+    return rows;
+  })();
+  const tabHeader = ["", "Incoming", "Eligibility review", "QPA defense", "Respond & pay"][tab] || "";
 
   return (
     <div className="app">
       <div className="masthead">
-        <div className="brand"><span className="lg">B</span> Avertyn</div>
+        <div className="brand"><span className="lg">A</span> Avertyn</div>
         <div className="switch">Meridian Plan Administrators ⌄</div>
         <div className="grow" />
-        <div className="search"><span>Search…</span><span className="kbd">⌘K</span></div>
-        <span className="badge" title="Unread notifications"><i className={"dot " + (notifs ? "d-red" : "d-green")} />{notifs} alerts</span>
+        <div className="search" title="Search coming soon"><span>Search…</span><span className="kbd">⌘K</span></div>
+        <button className="bell" title="Notifications" onClick={() => setNotifOpen(true)}>
+          <span className="badge"><i className={"dot " + (notifs ? "d-red" : "d-green")} />{notifs} alerts</span>
+        </button>
         <span className="who">{email}</span>
         <button className="linkbtn" onClick={signOut}>Sign out</button>
       </div>
@@ -95,25 +224,48 @@ export default function Dashboard() {
 
       {tab === 0 ? (
         <div style={{ flex: 1, overflow: "auto", padding: 22 }}>
-          <CommandCenter metrics={metrics} agentM={agentM} scorecard={scorecard}
-            onVerify={verifyLedger} onExport={exportData} onAutopilot={runAutopilot} busy={busy} verify={verify} />
+          <CommandCenter metrics={metrics} score={score} awardsM={awardsM} agentM={agentM}
+            scorecard={scorecard} gap={gap} onVerify={verifyLedger} onExport={exportData}
+            onAutopilot={runAutopilot} busy={busy} verify={verify} />
         </div>
-      ) : tab === 1 ? (
+      ) : tab === 5 ? (
+        <div style={{ flex: 1, overflow: "auto", padding: 22 }}>
+          <ExposureView exposure={exposure} />
+        </div>
+      ) : tab === 6 ? (
+        <div style={{ flex: 1, overflow: "hidden" }}>
+          <InboxView email={email} orgId={orgId} onErr={setErr} />
+        </div>
+      ) : tab === 7 ? (
+        <div style={{ flex: 1, overflow: "auto", padding: 22 }}>
+          <TasksView email={email} orgId={orgId} userId={userId} onErr={setErr} />
+        </div>
+      ) : tab === 8 ? (
+        <div style={{ flex: 1, overflow: "auto", padding: 22 }}>
+          <CalendarView onErr={setErr} />
+        </div>
+      ) : tab === 9 ? (
+        <div style={{ flex: 1, overflow: "auto", padding: 22 }}>
+          <PredictionsView onErr={setErr} onOpen={(id) => { setSel(id); setTab(1); }} />
+        </div>
+      ) : (
         <div className="work">
           <div className="list">
-            <div className="lhdr"><b>Incoming</b><span className="ct">{rows.length} disputes</span></div>
-            {rows.map((r) => {
-              const rd = read(r);
-              return (
-                <div key={r.id} className={"lrow" + (r.id === sel ? " on" : "")} onClick={() => setSel(r.id)}>
-                  <div className="r1"><b>#{r.external_ref}</b><span className="badge"><i className={"dot d-" + rd.tone} />{rd.label}</span></div>
-                  <div className="r2">{r.initiators?.name || "—"} · {money(r.demand_amount)} · {r.workflow_state}</div>
-                </div>
-              );
-            })}
+            <div className="lhdr"><b>{tabHeader}</b><span className="ct">{filtered.length} disputes</span></div>
+            {filtered.length === 0
+              ? <p className="muted" style={{ padding: 16 }}>Nothing in this stage right now.</p>
+              : filtered.map((r) => {
+                  const rd = read(r);
+                  return (
+                    <div key={r.id} className={"lrow" + (r.id === sel ? " on" : "")} onClick={() => setSel(r.id)}>
+                      <div className="r1"><b>#{r.external_ref}</b><span className="badge"><i className={"dot d-" + rd.tone} />{rd.label}</span></div>
+                      <div className="r2">{r.initiators?.name || "—"} · {money(r.demand_amount)} · {r.workflow_state}</div>
+                    </div>
+                  );
+                })}
           </div>
           <div className="detail">
-            {!detail ? <p className="muted">Select a dispute…</p> : <Detail dd={detail} onRun={runEngine} onDoc={genLetter} busy={busy} />}
+            {!detail ? <p className="muted">Select a dispute…</p> : <Detail dd={detail} onRun={runEngine} onDoc={genLetter} onOpenNeg={openNeg} onAction={caseAction} onStageMoney={stageMoney} onView={setDocView} busy={busy} />}
           </div>
           <div className="rail">
             <div className="rlabel">Autopilot · governed</div>
@@ -124,34 +276,52 @@ export default function Dashboard() {
               </div>
               {metrics && <p className="muted" style={{ marginTop: 8 }}>{metrics.open_disputes} open · {money(metrics.dollars_defended)} defended · {metrics.challenges_filed} challenges</p>}
             </div>
+
             <div className="rlabel">Autonomy dial</div>
             <div className="rcard" style={{ padding: "4px 13px" }}>
-              <div className="dial"><span>Triage · Defend · Challenge</span><span className="badge"><i className="dot d-ink" />Auto</span></div>
-              <div className="dial"><span>Submit response</span><span className="badge"><i className="dot d-amber" />Review</span></div>
-              <div className="dial"><span>Schedule pay · Settle</span><span className="badge"><i className="dot d-amber" />Review</span></div>
+              {autonomy.length === 0 ? <p className="muted" style={{ padding: "8px 0" }}>No policy set.</p> : autonomy.map((a) => (
+                <div key={a.action_type} className="dial">
+                  <span>{ACTION_LABEL[a.action_type] || a.action_type}</span>
+                  <select className="dsel" value={a.mode} disabled={busy === "dial" + a.action_type}
+                    onChange={(e) => setAutonomy_(a.action_type, e.target.value)}>
+                    {MODES.map((m) => <option key={m} value={m}>{m[0].toUpperCase() + m.slice(1)}</option>)}
+                  </select>
+                </div>
+              ))}
             </div>
+
             <div className="rlabel">Waiting for you · {queue.length}</div>
-            {queue.length === 0 ? <p className="muted">Nothing staged.</p> : queue.map((q) => (
-              <div key={q.id} className="rcard">
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                  <b style={{ fontSize: 12 }}>{q.action_type} · {money(q.amount)}</b><span className="badge"><i className="dot d-amber" />Review</span>
+            {queue.length === 0 ? <p className="muted">Nothing staged.</p> : queue.map((q) => {
+              const isMoney = MONEY.has(q.action_type);
+              return (
+                <div key={q.id} className="rcard">
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                    <b style={{ fontSize: 12 }}>{q.action_type} · {money(q.amount)}</b>
+                    <span className={"badge " + (isMoney ? "b-red" : "b-amber")}><i className={"dot d-" + (isMoney ? "red" : "amber")} />{isMoney ? "Dual-control" : "Review"}</span>
+                  </div>
+                  {q.rationale && <div className="muted" style={{ fontSize: 11, margin: "6px 0 9px" }}>{q.rationale}</div>}
+                  <div style={{ display: "flex", gap: 7 }}>
+                    {isMoney
+                      ? <button className="btn btn-a" style={{ padding: "7px 12px" }} disabled={busy === "rel" + q.id} onClick={() => setMoneyRel(q)}>Release · step-up</button>
+                      : <button className="btn btn-a" style={{ padding: "7px 12px" }} disabled={busy === "rel" + q.id} onClick={() => release(q.id)}>Release</button>}
+                    <button className="btn btn-s" style={{ padding: "7px 12px" }} disabled={busy === "rej" + q.id} onClick={() => reject(q.id)}>Reject</button>
+                  </div>
                 </div>
-                {q.rationale && <div className="muted" style={{ fontSize: 11, margin: "6px 0 9px" }}>{q.rationale}</div>}
-                <div style={{ display: "flex", gap: 7 }}>
-                  <button className="btn btn-a" style={{ padding: "7px 12px" }} disabled={busy === "rel" + q.id} onClick={() => release(q.id)}>Release</button>
-                  <button className="btn btn-s" style={{ padding: "7px 12px" }} disabled={busy === "rej" + q.id} onClick={() => reject(q.id)}>Reject</button>
-                </div>
-              </div>
-            ))}
+              );
+            })}
+
             <div className="rlabel">Agent activity · ledger</div>
             <div className="rcard"><div className="feed">
               {feed.map((e, i) => <div key={i}>{e.actor === "agent" ? "✦" : "•"} <b>{e.action_type}</b> · {e.actor}{e.rationale ? " — " + e.rationale.slice(0, 60) : ""}</div>)}
             </div></div>
           </div>
         </div>
-      ) : (
-        <div style={{ flex: 1, display: "grid", placeItems: "center", color: "var(--mut)" }}>{TABS[tab]} — view coming next</div>
       )}
+
+      {notifOpen && <NotifDrawer list={notifList} onClose={() => setNotifOpen(false)} onOpen={openNotif} onAllRead={markAllRead} />}
+      {docView && <DocModal doc={docView} onClose={() => setDocView(null)} />}
+      {moneyRel && <MoneyReleaseModal q={moneyRel} onClose={() => setMoneyRel(null)} onRelease={(amt) => { releaseMoney(moneyRel.id, amt); setMoneyRel(null); }} />}
+      {err && <div className="toast"><span className="td" />{err}<button onClick={() => { setErr(""); loadShell(); }}>Retry</button><button onClick={() => setErr("")}>Dismiss</button></div>}
     </div>
   );
 }
@@ -164,18 +334,46 @@ function read(r) {
   return { label: "Defensible", tone: "green" };
 }
 
-function CommandCenter({ metrics, agentM, scorecard, onVerify, onExport, onAutopilot, busy, verify }) {
+function pct(n) { return n == null ? "—" : Math.round(Number(n)) + "%"; }
+
+function CommandCenter({ metrics, score, awardsM, agentM, scorecard, gap, onVerify, onExport, onAutopilot, busy, verify }) {
   const overrideRate = agentM && (agentM.human_released + agentM.human_rejected)
     ? Math.round((agentM.human_rejected / (agentM.human_released + agentM.human_rejected)) * 100) : 0;
+  const dlr = score?.default_loss_rate;
+  const icr = score?.ineligible_caught_rate;
+  const otr = awardsM?.on_time_rate;
+  const settled = score?.avg_settled_pct_of_demand;
   return (
     <div>
       <div className="dh"><h1>Command center</h1><span className="sub">Meridian Plan Administrators · all plans</span></div>
+
       <div className="cards" style={{ marginTop: 14 }}>
-        <div className="box"><div className="l">Open disputes</div><div className="n">{metrics?.open_disputes ?? "—"}</div></div>
-        <div className="box"><div className="l">$ defended</div><div className="n">{money(metrics?.dollars_defended)}</div></div>
-        <div className="box"><div className="l">Challenges filed</div><div className="n">{metrics?.challenges_filed ?? "—"}</div></div>
-        <div className="box"><div className="l">Agent actions</div><div className="n">{agentM?.agent_actions ?? "—"}</div></div>
-        <div className="box"><div className="l">Human override</div><div className="n">{overrideRate}%</div></div>
+        <Tile l="Open disputes" n={score?.open_disputes ?? metrics?.open_disputes ?? "—"} />
+        <Tile l="$ defended" n={money(metrics?.dollars_defended)} />
+        <Tile l="Default-loss rate" n={pct(dlr)} goal="target 0%" good={dlr === 0} bad={dlr > 0} />
+        <Tile l="Ineligible caught" n={pct(icr)} goal="~40% of filings" />
+        <Tile l="Awards paid on time" n={awardsM?.awards_total ? pct(otr) : "—"} goal="target 100%" good={otr >= 100} bad={awardsM?.awards_total && otr < 100} />
+        <Tile l="Avg settled vs demand" n={pct(settled)} goal="lower is better" />
+        <Tile l="Agent actions" n={agentM?.agent_actions ?? "—"} />
+        <Tile l="Human override" n={overrideRate + "%"} />
+      </div>
+
+      <div className="panel">
+        <div className="ph">QPA gap by CPT<span className="act"><span className="muted" style={{ fontSize: 11 }}>demand ÷ QPA — where providers inflate most</span></span></div>
+        {gap.length === 0 ? <p className="muted" style={{ padding: 16 }}>No QPA data yet.</p> : (
+          <table>
+            <thead><tr><th>CPT</th><th>Disputes</th><th>Avg demand</th><th>Avg QPA</th><th>Demand ÷ QPA</th></tr></thead>
+            <tbody>
+              {gap.map((g, i) => (
+                <tr key={i}>
+                  <td><b>{g.cpt_code}</b></td><td className="mono">{g.disputes}</td>
+                  <td className="mono">{money(g.avg_demand)}</td><td className="mono">{money(g.avg_qpa)}</td>
+                  <td className="mono"><span className="badge b-red">{g.demand_to_qpa}×</span></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
       </div>
 
       <div className="panel">
@@ -208,8 +406,54 @@ function CommandCenter({ metrics, agentM, scorecard, onVerify, onExport, onAutop
   );
 }
 
-function Detail({ dd, onRun, onDoc, busy }) {
-  const { d, find, qpa } = dd;
+function Tile({ l, n, goal, good, bad }) {
+  return (
+    <div className="kpi-tile">
+      <div className="l">{l}</div>
+      <div className="n">{n}</div>
+      {goal && <div className={"goal" + (good ? " good" : bad ? " bad" : "")}>{goal}</div>}
+    </div>
+  );
+}
+
+function ExposureView({ exposure }) {
+  const totalRisk = exposure.reduce((a, e) => a + Number(e.at_risk || 0), 0);
+  const totalDef = exposure.reduce((a, e) => a + Number(e.defended || 0), 0);
+  return (
+    <div>
+      <div className="dh"><h1>Employer exposure</h1><span className="sub">What IDR is costing each plan sponsor — the view your brokers distribute</span></div>
+      <div className="cards" style={{ marginTop: 14 }}>
+        <Tile l="Employers" n={exposure.length} />
+        <Tile l="Total at risk (open)" n={money(totalRisk)} />
+        <Tile l="Defended to date" n={money(totalDef)} />
+      </div>
+      {exposure.length === 0 ? (
+        <div className="empty"><div className="eh">No employers yet</div><div className="es">Add employers and disputes to see per-sponsor IDR exposure and defended dollars.</div></div>
+      ) : (
+        <div className="exgrid">
+          {exposure.map((e) => (
+            <div key={e.employer_id} className="excard">
+              <div className="en">{e.employer}</div>
+              <div className="eb">{e.broker_name ? "Broker · " + e.broker_name : "No broker on file"}</div>
+              <div style={{ marginTop: 10 }}>
+                <div className="exrow"><span>Total disputes</span><span className="v">{e.total_disputes}</span></div>
+                <div className="exrow"><span>Open</span><span className="v">{e.open_disputes}</span></div>
+                <div className="exrow"><span>At risk (open)</span><span className="v risk">{money(e.at_risk)}</span></div>
+                <div className="exrow"><span>Default losses</span><span className="v">{e.default_losses}</span></div>
+                <div className="exrow"><span>Defended</span><span className="v good">{money(e.defended)}</span></div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function Detail({ dd, onRun, onDoc, onOpenNeg, onAction, onStageMoney, onView, busy }) {
+  const { d, find, qpa, docs, offers } = dd;
+  const hasOnp = (offers || []).some((o) => o.kind === "open_negotiation");
+  const closed = d.workflow_state === "closed";
   const s = d.eligibility_score ?? 0;
   const gcol = s >= 80 ? "var(--sig)" : s >= 60 ? "var(--warn)" : "var(--ok)";
   const verdict = s >= 80 ? ["Challenge — likely ineligible", "red"] : s >= 60 ? ["Review eligibility", "amber"] : ["Defensible", "green"];
@@ -222,11 +466,12 @@ function Detail({ dd, onRun, onDoc, busy }) {
           <div className="gauge" style={{ background: `conic-gradient(${gcol} ${s}%,#eeedea 0)` }}>
             <div className="v"><b style={{ color: gcol }}>{s}</b><span>Ineligible</span></div>
           </div>
-          <div><span className="badge"><i className={"dot d-" + verdict[1]} />{verdict[0]}</span>
+          <div><span className={"badge b-" + verdict[1]}><i className={"dot d-" + verdict[1]} />{verdict[0]}</span>
             <p className="muted" style={{ marginTop: 9, maxWidth: "22ch" }}>Ineligibility score from the rule engine.</p></div>
         </div>
         <div className="box"><div className="l">Demand vs QPA</div><div className="n">{money(d.demand_amount)}</div><div className="l" style={{ marginTop: 3 }}>QPA {money(d.qpa_amount)}</div></div>
       </div>
+
       <div className="panel">
         <div className="ph">Eligibility findings
           <span className="act"><button className="btn btn-s" style={{ padding: "6px 11px" }} disabled={busy === "engine"} onClick={onRun}>{busy === "engine" ? "Running…" : "Run engine"}</button></span>
@@ -239,6 +484,7 @@ function Detail({ dd, onRun, onDoc, busy }) {
           })}
         </div>
       </div>
+
       {qpa && (
         <div className="panel"><div className="ph">QPA defense</div><div className="pb">
           <Bar l="Demand" v={d.demand_amount} max={d.demand_amount} c="var(--sig)" />
@@ -248,21 +494,162 @@ function Detail({ dd, onRun, onDoc, busy }) {
           {qpa.notes && <p className="muted" style={{ fontSize: 12 }}>{qpa.notes}</p>}
         </div></div>
       )}
-      <div style={{ display: "flex", gap: 10, marginTop: 16 }}>
+
+      <div className="panel">
+        <div className="ph">Offers &amp; negotiation
+          <span className="act">
+            <button className="btn btn-s" style={{ padding: "6px 11px" }} disabled={busy === "oneg" || hasOnp} onClick={onOpenNeg}>
+              {busy === "oneg" ? "Sending…" : hasOnp ? "Open-negotiation sent" : "Send open-negotiation offer"}
+            </button>
+          </span>
+        </div>
+        <div className="pb">
+          {(!offers || offers.length === 0) ? <p className="muted">No offers yet. Open a negotiation to settle at ~125% of QPA before any IDR fee — the cheapest win.</p> : offers.map((o) => (
+            <div key={o.id} className="frow" style={{ alignItems: "center" }}>
+              <span className={"badge b-" + (o.party === "plan" ? "ink" : "amber")}>{o.party}</span>
+              <div style={{ flex: 1 }}><b className="mono">{money(o.amount)}</b><div className="sub">{o.kind?.replace(/_/g, " ")}{o.note ? " · " + o.note : ""}</div></div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div className="panel">
+        <div className="ph">Documents</div>
+        <div className="pb">
+          {(!docs || docs.length === 0) ? <p className="muted">No documents yet. Generate a challenge letter or position statement below.</p> : docs.map((doc) => (
+            <div key={doc.id} className="frow" style={{ alignItems: "center" }}>
+              <div style={{ flex: 1 }}>
+                <b>{doc.title || doc.kind?.replace(/_/g, " ")}</b>
+                <div className="sub">
+                  {doc.esign_status === "signed" ? `Signed by ${doc.signed_by || "—"}` : (doc.esign_status || "draft")}
+                  {" · "}{new Date(doc.created_at).toLocaleDateString()}
+                </div>
+              </div>
+              <button className="mini" onClick={() => onView(doc)}>View</button>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div style={{ display: "flex", gap: 10, marginTop: 16, flexWrap: "wrap" }}>
         {s >= 80
           ? <button className="btn btn-a" disabled={busy === "doc"} onClick={onDoc}>{busy === "doc" ? "Generating…" : "Generate & sign challenge letter"}</button>
           : <button className="btn btn-a">Submit response</button>}
       </div>
+
+      <div className="rlabel" style={{ marginTop: 18 }}>Case actions</div>
+      <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+        <button className="btn btn-s" disabled={closed || busy === "ca_submit_additional_info"} onClick={() => onAction("submit_additional_info", "Additional information within the 5-business-day window.")}>
+          {busy === "ca_submit_additional_info" ? "Filing…" : "Submit additional info"}
+        </button>
+        <button className="btn btn-s" disabled={busy === "ca_escalate"} onClick={() => onAction("escalate", "Operator escalation for human review.")}>
+          {busy === "ca_escalate" ? "Escalating…" : "Escalate"}
+        </button>
+        <button className="btn btn-s" disabled={closed || busy === "ca_withdraw"} onClick={() => onAction("withdraw", "Operator withdrew the dispute.")}>
+          {busy === "ca_withdraw" ? "Withdrawing…" : "Withdraw"}
+        </button>
+      </div>
+
+      <div className="rlabel" style={{ marginTop: 16 }}>Money actions · dual-control</div>
+      <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+        <button className="btn btn-s" disabled={closed || busy === "stage_settle" || !d.qpa_amount}
+          onClick={() => onStageMoney("settle", Number(d.qpa_amount), "Stage settlement at QPA for a second reviewer.")}>
+          {busy === "stage_settle" ? "Staging…" : `Stage settlement ${money(d.qpa_amount)}`}
+        </button>
+        {d.disposition === "provider_win" && (
+          <button className="btn btn-s" disabled={busy === "stage_schedule_payment"}
+            onClick={() => onStageMoney("schedule_payment", null, "Stage award payment for a second reviewer.")}>
+            {busy === "stage_schedule_payment" ? "Staging…" : "Stage payment"}
+          </button>
+        )}
+      </div>
+      <p className="muted" style={{ fontSize: 11, marginTop: 6 }}>
+        Money actions can't be executed directly — they stage for a different reviewer, who releases with step-up re-auth and amount confirmation.
+      </p>
     </div>
   );
 }
 
 function Bar({ l, v, max, c, showref }) {
-  const pct = max ? Math.min(100, Math.round((Number(v) / Number(max)) * 100)) : 0;
+  const pctv = max ? Math.min(100, Math.round((Number(v) / Number(max)) * 100)) : 0;
   return (
     <div className="bar">
       <div className="bl"><b>{l}</b><span className="mono">{money(v)}</span></div>
-      <div className="track"><div className="fill" style={{ width: pct + "%", background: c }} />{showref && <div className="qref" style={{ left: pct + "%" }} />}</div>
+      <div className="track"><div className="fill" style={{ width: pctv + "%", background: c }} />{showref && <div className="qref" style={{ left: pctv + "%" }} />}</div>
+    </div>
+  );
+}
+
+function NotifDrawer({ list, onClose, onOpen, onAllRead }) {
+  return (
+    <>
+      <div className="drawer-bg" onClick={onClose} />
+      <div className="drawer">
+        <div className="dhd">Notifications<span style={{ flex: 1 }} />
+          <button className="mini" onClick={onAllRead}>Mark all read</button>
+          <button className="x" onClick={onClose}>×</button>
+        </div>
+        <div className="body">
+          {list.length === 0 ? <p className="muted" style={{ padding: 16 }}>No notifications.</p> : list.map((n) => (
+            <div key={n.id} className={"nrow" + (n.read ? "" : " unread")} onClick={() => onOpen(n)} style={{ cursor: "pointer" }}>
+              <i className={"dot d-" + (n.severity === "urgent" ? "red" : n.severity === "warn" ? "amber" : "green")} style={{ marginTop: 5 }} />
+              <div style={{ flex: 1 }}>
+                <div className="nt">{n.title}</div>
+                {n.body && <div className="nb">{n.body}</div>}
+                <div className="nm">{new Date(n.created_at).toLocaleString()}</div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </>
+  );
+}
+
+function MoneyReleaseModal({ q, onRelease, onClose }) {
+  const [amt, setAmt] = useState("");
+  const [ack, setAck] = useState(false);
+  const ok = ack && amt !== "" && Number(amt) === Number(q.amount);
+  return (
+    <div className="modal-bg" onClick={onClose}>
+      <div className="modal" style={{ width: 460 }} onClick={(e) => e.stopPropagation()}>
+        <div className="mhd"><b>Release money action</b>
+          <span className="badge b-red"><i className="dot d-red" />Dual-control</span>
+          <button className="x" onClick={onClose}>×</button>
+        </div>
+        <div className="mbody">
+          <p className="muted" style={{ marginTop: 0 }}>
+            {q.action_type.replace(/_/g, " ")} · <b>{money(q.amount)}</b>. A money action needs a second reviewer, step-up re-auth, and the amount re-typed.
+          </p>
+          <div className="rlabel" style={{ margin: "10px 0 4px" }}>Re-type the amount</div>
+          <input value={amt} onChange={(e) => setAmt(e.target.value)} inputMode="decimal" placeholder={String(q.amount)}
+            style={{ width: "100%", padding: "11px 13px", border: "1px solid var(--line)", borderRadius: 10, font: "inherit", fontSize: 13 }} />
+          <label style={{ display: "flex", gap: 8, alignItems: "flex-start", marginTop: 12, fontSize: 12.5, color: "var(--mut)" }}>
+            <input type="checkbox" checked={ack} onChange={(e) => setAck(e.target.checked)} style={{ marginTop: 2 }} />
+            I have re-authenticated (step-up) and approve this payment as a second reviewer.
+          </label>
+          <button className="btn btn-a" style={{ marginTop: 16, width: "100%" }} disabled={!ok} onClick={() => onRelease(Number(amt))}>
+            Release {money(q.amount)}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function DocModal({ doc, onClose }) {
+  return (
+    <div className="modal-bg" onClick={onClose}>
+      <div className="modal" onClick={(e) => e.stopPropagation()}>
+        <div className="mhd">
+          <b>{doc.title || doc.kind?.replace(/_/g, " ")}</b>
+          {doc.esign_status === "signed" && <span className="badge b-green"><i className="dot d-green" />Signed{doc.signed_by ? " · " + doc.signed_by : ""}</span>}
+          <button className="x" onClick={onClose}>×</button>
+        </div>
+        <div className="mbody">
+          {doc.content ? <pre>{doc.content}</pre> : <p className="muted">This document has no inline content (stored as a file).</p>}
+        </div>
+      </div>
     </div>
   );
 }

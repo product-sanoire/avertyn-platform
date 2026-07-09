@@ -34,7 +34,7 @@ export default function Login() {
             onChange={(e) => setEmail(e.target.value)}
           />
           <button className="btn" type="submit">Send magic link</button>
-          {err && <p className="muted" style={{ color: "var(--red)", marginTop: 10 }}>{err}</p>}
+          {err && <p style={{ color: "var(--sig)", marginTop: 10, fontSize: 12.5 }}>{err}</p>}
         </form>
       )}
     </div>
