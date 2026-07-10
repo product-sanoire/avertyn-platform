@@ -1,0 +1,61 @@
+# Avertyn — session context for Claude (read this first)
+
+This file is the durable memory across sessions. A fresh Cloud/Cowork session has
+no recollection of prior work; everything an agent needs to deploy correctly lives here.
+
+## Which repo is the deploy target — IMPORTANT
+
+- **`product-sanoire/avertyn-platform`  ← THIS REPO. Deploy target. Canonical.**
+  Vercel is git-linked to it and auto-deploys `main` to **https://platform.avertyn.com**.
+  All application work must land here.
+- `product-sanoire/avertyn-app` — the user's local development mirror
+  (`C:\Users\jenni\Documents\Avertyn\app`). It is **not** what Vercel deploys.
+  Do not push app changes here expecting them to go live. The two repos have diverged;
+  never push one's `main` onto the other (histories are unrelated → rejected).
+
+When in doubt, the live product = whatever is on `avertyn-platform` `main`.
+
+## Deploy workflow
+
+Normal path: commit to `main`, push, Vercel auto-deploys (~1–2 min). Verify with
+`curl https://platform.avertyn.com/dashboard` and grep the served
+`/_next/static/chunks/app/dashboard/page-*.js` chunk for new strings.
+
+**Known caveat — the git proxy:** the Cloud/Cowork sandbox routes all GitHub traffic
+through a proxy that only injects credentials for repos in *that session's* authorized
+set. That set is fixed at session start. If a session was not started with
+`avertyn-platform` connected, every push is refused ("not in this session's authorized
+repository set") and it cannot be fixed mid-session. Two workarounds:
+1. Start a fresh Cowork session with `avertyn-platform` connected → push works normally.
+2. Deliver a `git bundle`/patch to the user; they pull + push from their own machine.
+
+## Backend — Supabase
+
+- Project ref: `ssjougrsaecdwfuxeasd` · URL `https://ssjougrsaecdwfuxeasd.supabase.co`
+- Anon (publishable) key and URL have public fallbacks hardcoded in
+  `lib/supabaseClient.js` — the build works without env vars.
+- Migrations live in `supabase/migrations/`; Edge Functions in `supabase/functions/`.
+  Both are applied/deployed live via the Supabase MCP tools, and mirrored here as
+  source-of-truth. Keep them in sync when you change the DB.
+- Multi-tenant, org-scoped by RLS. Auth helpers: `auth_org_id()`, `auth_role()`,
+  `can_action()`. Action ledger is hash-chained (`action_log`).
+
+## Product
+
+Plan-side / TPA **No Surprises Act IDR defense** platform. Core surfaces (dashboard tabs):
+Overview, Disputes, Deadlines, Intelligence (initiators / exposure / predictions),
+Workspace (inbox / tasks / calendar), Filing (batch → IDRE → file), Admin
+(access / reports / integrations). Explainability is a glass-box "Explain" modal on
+any dispute (`explain_dispute` + `qpa_explain`).
+
+## Stubs waiting on the user's credentials (flip to live when provided)
+
+- SSO login handshake (SAML/OIDC) — needs the user's IdP metadata (Okta/Azure).
+- Real outbound email on the notification rail — needs a Resend API key.
+  The SCIM 2.0 endpoint (`/functions/v1/scim`) and the scheduled-report pg_cron runner
+  are already fully live.
+
+## Security note
+
+A broad, non-expiring GitHub write PAT was used during setup. It should be rotated
+once proper auth is wired. Never commit tokens/keys to this repo.
