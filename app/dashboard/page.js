@@ -5,6 +5,7 @@ import { supabase } from "../../lib/supabaseClient";
 import { money } from "../../lib/format";
 import { InboxView, TasksView, CalendarView, PredictionsView } from "./ops";
 import { InitiatorsView, DeadlinesView, IntegrationsView } from "./tiera";
+import { ImportHub } from "./import";
 
 const TABS = ["Overview", "Disputes", "Deadlines", "Initiators", "Exposure", "Predictions", "Inbox", "Tasks", "Calendar", "Integrations"];
 const STAGES = [["all", "All"], ["incoming", "Incoming"], ["eligibility", "Eligibility"], ["qpa", "QPA defense"], ["respond", "Respond & pay"]];
@@ -41,6 +42,7 @@ export default function Dashboard() {
   const [notifs, setNotifs] = useState(0);
   const [notifList, setNotifList] = useState([]);
   const [notifOpen, setNotifOpen] = useState(false);
+  const [importOpen, setImportOpen] = useState(false);
   const [docView, setDocView] = useState(null);
   const [moneyRel, setMoneyRel] = useState(null);
   const [tab, setTab] = useState(0);
@@ -218,6 +220,7 @@ export default function Dashboard() {
         <div className="switch">Meridian Plan Administrators ⌄</div>
         <div className="grow" />
         <div className="search" title="Search coming soon"><span>Search…</span><span className="kbd">⌘K</span></div>
+        <button className="btn btn-s" style={{ padding: "7px 13px" }} onClick={() => setImportOpen(true)}>+ Import</button>
         <span className="live" title="Realtime — updates as disputes, awards and alerts move"><span className="pulse" />Live</span>
         <button className="bell" title="Notifications" onClick={() => setNotifOpen(true)}>
           <span className="badge"><i className={"dot " + (notifs ? "d-red" : "d-green")} />{notifs} alerts</span>
@@ -350,6 +353,7 @@ export default function Dashboard() {
       )}
 
       {notifOpen && <NotifDrawer list={notifList} onClose={() => setNotifOpen(false)} onOpen={openNotif} onAllRead={markAllRead} />}
+      {importOpen && <ImportHub orgId={orgId} onErr={setErr} onClose={() => setImportOpen(false)} onDone={loadShell} />}
       {docView && <DocModal doc={docView} onClose={() => setDocView(null)} />}
       {moneyRel && <MoneyReleaseModal q={moneyRel} onClose={() => setMoneyRel(null)} onRelease={(amt) => { releaseMoney(moneyRel.id, amt); setMoneyRel(null); }} />}
       {err && <div className="toast"><span className="td" />{err}<button onClick={() => { setErr(""); loadShell(); }}>Retry</button><button onClick={() => setErr("")}>Dismiss</button></div>}
