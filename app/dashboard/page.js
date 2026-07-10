@@ -375,12 +375,20 @@ function CommandCenter({ metrics, score, awardsM, agentM, scorecard, gap, onVeri
     <div>
       <div className="dh"><h1>Overview</h1><span className="sub">Meridian Plan Administrators · all plans</span></div>
 
-      <div className="cards" style={{ marginTop: 14 }}>
+      <div className="bento">
+        <div className="feat">
+          <div className="fl">Dollars defended · H1 2026</div>
+          <div className="fn">{money(metrics?.dollars_defended)}</div>
+          <div className="fs">Held out of provider hands across {score?.open_disputes ?? metrics?.open_disputes ?? "—"} open disputes — the number your brokers show employers.</div>
+          <div className="fmeta">
+            <span className="badge b-green">Default-loss {pct(dlr)}</span>
+            <span className="badge">{metrics?.challenges_filed ?? "—"} challenges filed</span>
+          </div>
+        </div>
         <Tile l="Open disputes" n={score?.open_disputes ?? metrics?.open_disputes ?? "—"} />
-        <Tile l="$ defended" n={money(metrics?.dollars_defended)} />
         <Tile l="Default-loss rate" n={pct(dlr)} goal="target 0%" good={dlr === 0} bad={dlr > 0} />
-        <Tile l="Ineligible caught" n={pct(icr)} goal="~40% of filings" />
-        <Tile l="Awards paid on time" n={awardsM?.awards_total ? pct(otr) : "—"} goal="target 100%" good={otr >= 100} bad={awardsM?.awards_total && otr < 100} />
+        <Tile l="Ineligible caught" n={pct(icr)} goal="~40% of filings" prog={icr} tone="var(--ink)" />
+        <Tile l="Awards paid on time" n={awardsM?.awards_total ? pct(otr) : "—"} goal="target 100%" good={otr >= 100} bad={awardsM?.awards_total && otr < 100} prog={awardsM?.awards_total ? otr : null} tone="var(--ok)" />
         <Tile l="Avg settled vs demand" n={pct(settled)} goal="lower is better" />
         <Tile l="Agent actions" n={agentM?.agent_actions ?? "—"} />
         <Tile l="Human override" n={overrideRate + "%"} />
@@ -434,11 +442,13 @@ function CommandCenter({ metrics, score, awardsM, agentM, scorecard, gap, onVeri
   );
 }
 
-function Tile({ l, n, goal, good, bad }) {
+function Tile({ l, n, goal, good, bad, prog, tone }) {
+  const hasProg = prog != null && !Number.isNaN(Number(prog));
   return (
     <div className="kpi-tile">
       <div className="l">{l}</div>
       <div className="n">{n}</div>
+      {hasProg && <div className="kprog"><div className="kprogf" style={{ width: Math.max(3, Math.min(100, Number(prog))) + "%", background: tone || "var(--ink)" }} /></div>}
       {goal && <div className={"goal" + (good ? " good" : bad ? " bad" : "")}>{goal}</div>}
     </div>
   );
