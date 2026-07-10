@@ -176,6 +176,21 @@ export default function Composer({ dispute }) {
     openEditor(data);          // data = new packet doc uuid
   }
 
+  // ---- unified packet: server renders the brief to PDF + appends exhibits, one continuous file ----
+  async function downloadPacketPdf() {
+    if (!doc?.id) return;
+    setBusy("packetpdf"); setErr("");
+    try {
+      const { data, error } = await supabase.functions.invoke("export-packet", { body: { dispute_id: id, doc_id: doc.id } });
+      if (error) throw error;
+      if (data?.ok && data.url) window.open(data.url, "_blank");
+      else setErr(data?.reason || "Could not build the packet PDF.");
+    } catch (e) {
+      setErr("Packet PDF unavailable: " + (e.message || e));
+    }
+    setBusy("");
+  }
+
   // ---- exhibits: server merges scanned evidence into one page-numbered PDF ----
   async function downloadExhibits() {
     setBusy("exhibits"); setErr("");
@@ -478,6 +493,10 @@ export default function Composer({ dispute }) {
           )}
           <span style={{ flex: 1 }} />
           <button className="mini" onClick={() => setShowVersions((v) => !v)}>{showVersions ? "Hide" : "History"} ({versions.length})</button>
+          <button className="btn btn-s" disabled={busy === "packetpdf"} onClick={downloadPacketPdf}
+            title="Render the brief to PDF and append your scanned exhibits — one continuously page-numbered filing packet">
+            {busy === "packetpdf" ? "Building packet…" : "⤓ Filing packet PDF"}
+          </button>
           <button className="mini" onClick={exportPDF}>Export PDF</button>
           <button className="mini" onClick={exportDOCX}>Export Word</button>
         </div>
