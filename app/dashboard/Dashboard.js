@@ -452,7 +452,7 @@ export default function Dashboard() {
         <div style={{ flex: 1, overflow: "auto", padding: "22px 26px" }}>
           <div className="shead">
             <div className="stitle">
-              <h1>Your leverage</h1>
+              <h1 className="vh">Your leverage</h1>
               <span className="sub">{intel === "exposure"
                 ? "What IDR is costing each plan sponsor — the view your brokers distribute"
                 : "Who's filing against your plans, how weak their filings are, and how each IDRE behaves — your negotiation leverage"}</span>
@@ -478,7 +478,7 @@ export default function Dashboard() {
       ) : (
         <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}>
           <div style={{ padding: "16px 24px 12px", display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
-            <h1 style={{ fontFamily: "var(--disp)", fontSize: 25, margin: 0, letterSpacing: "-.02em" }}>Cases</h1>
+            <h1 className="vh">Cases</h1>
             <div className="seg">
               {STAGES.map(([k, label]) => (
                 <button key={k} className={stage === k ? "on" : ""} onClick={() => setStage(k)}>{label}</button>
@@ -684,7 +684,7 @@ function CommandCenter({ metrics, score, awardsM, agentM, scorecard, gap, onVeri
   const settled = score?.avg_settled_pct_of_demand;
   return (
     <div>
-      <div className="dh"><h1>Where you stand</h1><span className="sub">All plans · H1 2026</span></div>
+      <div className="dh"><h1 className="vh">Where you stand</h1><span className="sub">All plans · H1 2026</span></div>
 
       <div className="bento">
         <div className="feat">
@@ -817,7 +817,7 @@ td{padding:11px 10px;border-bottom:1px solid #efeade}td.n{text-align:right;font-
     <div>
       {embedded
         ? <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 4 }}><button className="mini" disabled={!exposure.length} onClick={printBrief}>Export broker brief →</button></div>
-        : <div className="dh"><h1>Exposure</h1><span className="sub">What IDR is costing each plan sponsor — the view your brokers distribute</span>
+        : <div className="dh"><h1 className="vh">Exposure</h1><span className="sub">What IDR is costing each plan sponsor — the view your brokers distribute</span>
           <button className="mini" style={{ marginLeft: "auto" }} disabled={!exposure.length} onClick={printBrief}>Export broker brief →</button></div>}
       <div className="cards" style={{ marginTop: embedded ? 4 : 14 }}>
         <Tile l="Employers" n={exposure.length} />

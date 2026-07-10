@@ -42,7 +42,7 @@ export function InitiatorsView({ orgId, onErr, embedded }) {
 
   return (
     <div>
-      {!embedded && <div className="dh"><h1>Initiators &amp; IDREs</h1>
+      {!embedded && <div className="dh"><h1 className="vh">Initiators &amp; IDREs</h1>
         <span className="sub">Who's filing against your plans, how weak their filings are, and how each IDRE behaves — your negotiation leverage</span></div>}
 
       <div className="cards" style={{ marginTop: embedded ? 4 : 14 }}>
@@ -160,7 +160,7 @@ export function DeadlinesView({ orgId, onErr, embedded }) {
 
   return (
     <div>
-      {!embedded && <div className="dh"><h1>Deadlines &amp; delivery</h1>
+      {!embedded && <div className="dh"><h1 className="vh">Deadlines &amp; delivery</h1>
         <span className="sub">Never miss a window — the rail that kills default losses, plus the alerts that actually go out</span></div>}
 
       <div className="cards" style={{ marginTop: embedded ? 4 : 14 }}>
@@ -290,7 +290,7 @@ export function IntegrationsView({ onErr, embedded }) {
 
   return (
     <div>
-      {!embedded && <div className="dh"><h1>Integrations · Eligibility API</h1>
+      {!embedded && <div className="dh"><h1 className="vh">Integrations · Eligibility API</h1>
         <span className="sub">Embed Avertyn's NSA eligibility pre-screen in a clearinghouse or another TPA — the distribution play</span></div>}
 
       {fresh && (

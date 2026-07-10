@@ -220,7 +220,7 @@ export function WorkspaceHub({ email, orgId, userId, onErr }) {
       {/* view switch */}
       <div className="ws-bar">
         <div>
-          <h2 className="ws-title">{view === "today" ? "Today" : view === "week" ? "This week" : "Calendar"}</h2>
+          <h2 className="ws-title vh">{view === "today" ? "Today" : view === "week" ? "This week" : "Calendar"}</h2>
           <div className="ws-sub">{view === "today" ? "Everything that needs you, ranked by urgency" : view === "week" ? "Deadlines, tasks & events by day" : "Business-day, holiday-aware windows & events"}</div>
         </div>
         <div className="ws-seg">

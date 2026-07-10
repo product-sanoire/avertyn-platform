@@ -136,7 +136,7 @@ export function TasksView({ email, orgId, userId, onErr, embedded }) {
   const done = tasks.filter((t) => t.status === "done");
   return (
     <div>
-      {!embedded && <div className="dh"><h1>Tasks</h1><span className="sub">{open.length} open · {done.length} done</span></div>}
+      {!embedded && <div className="dh"><h1 className="vh">Tasks</h1><span className="sub">{open.length} open · {done.length} done</span></div>}
       <div style={{ display: "flex", gap: 8, marginTop: embedded ? 0 : 14, maxWidth: 560 }}>
         <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Add a task…"
           onKeyDown={(e) => e.key === "Enter" && add()}
@@ -216,7 +216,7 @@ export function CalendarView({ onErr, embedded }) {
     <div>
       {embedded
         ? <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 12 }}>{nav}</div>
-        : <div className="dh"><h1>Calendar</h1><span className="sub">Business-day, holiday-aware windows</span>
+        : <div className="dh"><h1 className="vh">Calendar</h1><span className="sub">Business-day, holiday-aware windows</span>
           <div style={{ marginLeft: "auto" }}>{nav}</div></div>}
       <div className="panel" style={{ marginTop: embedded ? 0 : 16 }}>
         <div className="calgrid calhead">
@@ -313,7 +313,7 @@ export function PredictionsView({ onErr, onOpen, embedded }) {
 
   return (
     <div>
-      <div className="dh"><h1>Predictions</h1><span className="sub">Win-probability &amp; optimal-offer model · what the agent acts on</span></div>
+      <div className="dh"><h1 className="vh">Predictions</h1><span className="sub">Win-probability &amp; optimal-offer model · what the agent acts on</span></div>
       <div className="cards" style={{ marginTop: 14 }}>
         <div className="kpi-tile"><div className="l">Cases modeled</div><div className="n">{preds.length}</div></div>
         <div className="kpi-tile"><div className="l">Avg plan-prevail</div><div className="n">{avgWin}%</div></div>

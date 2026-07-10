@@ -20,6 +20,7 @@
   --serif:var(--disp); --red:var(--sig); --ind:#191b1f; --gold:#8a91a0; --navy:#656a72;
 }
 *{box-sizing:border-box}
+.vh{position:absolute!important;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
 html,body{height:100%}
 body{
   margin:0;font-family:var(--sans);color:var(--ink);font-size:14.5px;line-height:1.5;letter-spacing:-.011em;
@@ -88,7 +89,7 @@ input,select,textarea{color:var(--ink);font-family:inherit}
 .lrow .r1 b{font-size:13.5px}.lrow .r2{font-size:11.5px;color:var(--mut);margin-top:5px}
 
 .detail{overflow:auto;background:transparent;padding:26px 30px}
-.dh{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap}
+.dh{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;padding-bottom:13px;margin-bottom:16px;border-bottom:1px solid var(--hair)}
 .dh h1{font-family:var(--disp);font-weight:600;font-size:34px;line-height:1.05;margin:0;letter-spacing:-.025em}
 .dh .sub{color:var(--mut);font-size:13px}
 
@@ -508,9 +509,9 @@ input,select,textarea{color:var(--ink);font-family:inherit}
 /* ============================================================ Workspace hub
    Cockpit + Week + Month. Ink & Paper, deadline-safe, case-aware. */
 .wsroot{display:flex;flex-direction:column;min-height:0;flex:1}
-.ws-bar{display:flex;align-items:center;gap:14px;padding:16px 24px 12px}
+.ws-bar{display:flex;align-items:center;gap:14px;padding:16px 24px 13px;border-bottom:1px solid var(--hair)}
 .ws-title{font-family:var(--disp);font-weight:500;font-size:23px;letter-spacing:-.02em;margin:0}
-.ws-sub{color:var(--faint);font-size:12.5px;margin-top:1px}
+.ws-sub{color:var(--mut);font-size:13px;margin-top:1px}
 .ws-seg{margin-left:auto;display:inline-flex;background:var(--sunk);border-radius:12px;padding:4px;gap:3px}
 .ws-seg button{font:inherit;font-weight:600;font-size:13px;color:var(--mut);border:0;background:transparent;padding:8px 16px;border-radius:9px;cursor:pointer}
 .ws-seg button.on{background:var(--card);color:var(--ink);box-shadow:var(--sh-1)}

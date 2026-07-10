@@ -31,7 +31,7 @@ export function AdminView({ orgId, onErr }) {
     <div>
       <div className="shead">
         <div className="stitle">
-          <h1>Org controls</h1>
+          <h1 className="vh">Org controls</h1>
           <span className="sub">Identity, provisioning, scheduled reporting and API distribution — the controls IT and compliance ask for</span>
         </div>
         <div className="seg">
