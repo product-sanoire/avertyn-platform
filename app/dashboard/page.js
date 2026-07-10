@@ -4,11 +4,14 @@ import { useRouter } from "next/navigation";
 import { supabase } from "../../lib/supabaseClient";
 import { money } from "../../lib/format";
 import { InboxView, TasksView, CalendarView, PredictionsView } from "./ops";
-import { InitiatorsView, DeadlinesView, IntegrationsView } from "./tiera";
+import { InitiatorsView, DeadlinesView } from "./tiera";
 import { ImportHub } from "./import";
 import { CommandPalette } from "./palette";
+import { FilingView } from "./filing";
+import { AdminView } from "./admin";
+import { ExplainModal } from "./explain";
 
-const TABS = ["Overview", "Disputes", "Deadlines", "Intelligence", "Workspace", "Integrations"];
+const TABS = ["Overview", "Disputes", "Deadlines", "Intelligence", "Workspace", "Filing", "Admin"];
 const INTEL = [["initiators", "Initiators & IDREs"], ["exposure", "Employer exposure"], ["predictions", "Predictions"]];
 const WORKSPACE = [["inbox", "Inbox"], ["tasks", "Tasks"], ["calendar", "Calendar"]];
 const STAGES = [["all", "All"], ["incoming", "Incoming"], ["eligibility", "Eligibility"], ["qpa", "QPA defense"], ["respond", "Respond & pay"]];
@@ -60,6 +63,7 @@ export default function Dashboard() {
   const [notifOpen, setNotifOpen] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
   const [paletteOpen, setPaletteOpen] = useState(false);
+  const [explainId, setExplainId] = useState(null);
   const [docView, setDocView] = useState(null);
   const [moneyRel, setMoneyRel] = useState(null);
   const [tab, setTab] = useState(0);
@@ -313,7 +317,11 @@ export default function Dashboard() {
         </div>
       ) : tab === 5 ? (
         <div style={{ flex: 1, overflow: "auto", padding: 22 }}>
-          <IntegrationsView onErr={setErr} />
+          <FilingView orgId={orgId} onErr={setErr} />
+        </div>
+      ) : tab === 6 ? (
+        <div style={{ flex: 1, overflow: "auto", padding: 22 }}>
+          <AdminView orgId={orgId} onErr={setErr} />
         </div>
       ) : (
         <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}>
@@ -367,7 +375,7 @@ export default function Dashboard() {
                 })}
           </div>
           <div className="detail">
-            {!detail ? <p className="muted">Select a dispute…</p> : <Detail dd={detail} onRun={runEngine} onDoc={genLetter} onOpenNeg={openNeg} onAction={caseAction} onStageMoney={stageMoney} onView={setDocView} busy={busy} />}
+            {!detail ? <p className="muted">Select a dispute…</p> : <Detail dd={detail} onRun={runEngine} onDoc={genLetter} onOpenNeg={openNeg} onAction={caseAction} onStageMoney={stageMoney} onView={setDocView} onExplain={() => setExplainId(sel)} busy={busy} />}
           </div>
           <div className="rail">
             <div className="rlabel">Autopilot · governed</div>
@@ -429,6 +437,7 @@ export default function Dashboard() {
         onImport={() => { setImportOpen(true); setPaletteOpen(false); }}
         onAutopilot={() => { runAutopilot(); setPaletteOpen(false); }}
         onClose={() => setPaletteOpen(false)} />}
+      {explainId && <ExplainModal disputeId={explainId} onClose={() => setExplainId(null)} />}
       {docView && <DocModal doc={docView} onClose={() => setDocView(null)} />}
       {moneyRel && <MoneyReleaseModal q={moneyRel} onClose={() => setMoneyRel(null)} onRelease={(amt) => { releaseMoney(moneyRel.id, amt); setMoneyRel(null); }} />}
       {err && <div className="toast"><span className="td" />{err}<button onClick={() => { setErr(""); loadShell(); }}>Retry</button><button onClick={() => setErr("")}>Dismiss</button></div>}
@@ -595,7 +604,7 @@ td{padding:11px 10px;border-bottom:1px solid #efeade}td.n{text-align:right;font-
   );
 }
 
-function Detail({ dd, onRun, onDoc, onOpenNeg, onAction, onStageMoney, onView, busy }) {
+function Detail({ dd, onRun, onDoc, onOpenNeg, onAction, onStageMoney, onView, onExplain, busy }) {
   const { d, find, qpa, docs, offers } = dd;
   const hasOnp = (offers || []).some((o) => o.kind === "open_negotiation");
   const closed = d.workflow_state === "closed";
@@ -606,7 +615,10 @@ function Detail({ dd, onRun, onDoc, onOpenNeg, onAction, onStageMoney, onView, b
     <div>
       <div className="dh"><h1>#{d.external_ref}</h1>
         <span className="sub">{d.initiators?.name} · CPT {d.cpt_code} · {d.plans?.name} · {d.workflow_state}</span>
-        <a className="mini" href={`/dispute/${d.id}`} style={{ marginLeft: "auto" }}>Open IDR case →</a></div>
+        <span style={{ marginLeft: "auto", display: "flex", gap: 8 }}>
+          <button className="mini" onClick={onExplain}>Explain ⓘ</button>
+          <a className="mini" href={`/dispute/${d.id}`}>Open IDR case →</a>
+        </span></div>
       <div className="cards">
         <div className="box" style={{ display: "flex", gap: 16, alignItems: "center" }}>
           <div className="gauge" style={{ background: `conic-gradient(${gcol} ${s}%,#eeedea 0)` }}>
