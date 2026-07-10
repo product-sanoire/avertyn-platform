@@ -190,7 +190,7 @@ export function CalendarView({ onErr }) {
   // group by day
   const groups = {};
   upcoming.forEach((i) => { const k = new Date(i.at).toDateString(); (groups[k] = groups[k] || []).push(i); });
-  const kindTone = { deadline: "red", filing: "amber", meeting: "ink", reminder: "grey" };
+  const kindTone = { deadline: "red", filing: "clay", meeting: "indigo", reminder: "sage" };
   return (
     <div>
       <div className="dh"><h1>Calendar &amp; deadlines</h1><span className="sub">{upcoming.length} upcoming · business-day, holiday-aware windows</span></div>
@@ -220,7 +220,7 @@ function driverList(drivers) {
   if (typeof drivers === "object") return Object.entries(drivers).map(([k, v]) => `${k}: ${v}`);
   return [String(drivers)];
 }
-const RECO_TONE = { challenge: "red", defend: "ink", settle: "amber" };
+const RECO_TONE = { challenge: "red", defend: "teal", settle: "amber" };
 export function PredictionsView({ onErr, onOpen }) {
   const [preds, setPreds] = useState([]);
   const load = useCallback(async () => {

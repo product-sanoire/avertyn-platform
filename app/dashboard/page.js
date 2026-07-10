@@ -133,9 +133,11 @@ export default function Dashboard() {
       .on("postgres_changes", { event: "*", schema: "public", table: "approval_queue" }, loadOps)
       .on("postgres_changes", { event: "*", schema: "public", table: "notifications" }, loadOps)
       .on("postgres_changes", { event: "*", schema: "public", table: "action_log" }, loadOps)
+      .on("postgres_changes", { event: "*", schema: "public", table: "disputes" }, loadShell)
+      .on("postgres_changes", { event: "*", schema: "public", table: "awards" }, loadShell)
       .subscribe();
     return () => { supabase.removeChannel(ch); };
-  }, [orgId, loadOps]);
+  }, [orgId, loadOps, loadShell]);
 
   // ---- actions -------------------------------------------------------------
   async function act(name, fn, opts = {}) {
@@ -216,6 +218,7 @@ export default function Dashboard() {
         <div className="switch">Meridian Plan Administrators ⌄</div>
         <div className="grow" />
         <div className="search" title="Search coming soon"><span>Search…</span><span className="kbd">⌘K</span></div>
+        <span className="live" title="Realtime — updates as disputes, awards and alerts move"><span className="pulse" />Live</span>
         <button className="bell" title="Notifications" onClick={() => setNotifOpen(true)}>
           <span className="badge"><i className={"dot " + (notifs ? "d-red" : "d-green")} />{notifs} alerts</span>
         </button>
@@ -527,8 +530,8 @@ function Detail({ dd, onRun, onDoc, onOpenNeg, onAction, onStageMoney, onView, b
         <div className="panel"><div className="ph">QPA defense</div><div className="pb">
           <Bar l="Demand" v={d.demand_amount} max={d.demand_amount} c="var(--sig)" />
           <Bar l="Plan QPA" v={qpa.plan_qpa} max={d.demand_amount} c="var(--ink)" showref />
-          <Bar l="FAIR Health median" v={qpa.benchmark_fairhealth} max={d.demand_amount} c="#b9b6b0" />
-          <Bar l="Defensible ceiling" v={qpa.defensible_ceiling} max={d.demand_amount} c="#8f8d88" />
+          <Bar l="FAIR Health median" v={qpa.benchmark_fairhealth} max={d.demand_amount} c="var(--c-teal)" />
+          <Bar l="Defensible ceiling" v={qpa.defensible_ceiling} max={d.demand_amount} c="var(--c-sage)" />
           {qpa.notes && <p className="muted" style={{ fontSize: 12 }}>{qpa.notes}</p>}
         </div></div>
       )}
