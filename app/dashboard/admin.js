@@ -221,6 +221,42 @@ function AccessView({ orgId, onErr }) {
           </table>
         )}
       </div>
+
+      {/* Getting started checklist — bring the Overview launcher back */}
+      <GettingStartedControl onErr={onErr} />
+    </div>
+  );
+}
+
+// Lets an admin re-show the Overview getting-started launcher after it was hidden
+// (either the per-session ✕ or a permanent dismiss from the full setup page).
+function GettingStartedControl({ onErr }) {
+  const [busy, setBusy] = useState(false);
+  const [done, setDone] = useState(false);
+  async function showAgain() {
+    setBusy(true);
+    try {
+      try { sessionStorage.removeItem("avertyn.gs.hiddenThisSession"); } catch (_) {}
+      const { error } = await supabase.rpc("onboarding_dismiss", { p_dismissed: false });
+      if (error) throw error;
+      setDone(true);
+    } catch (e) { onErr?.(e.message); }
+    setBusy(false);
+  }
+  return (
+    <div className="panel">
+      <div className="ph">Getting started checklist
+        <span className="act"><span className="muted" style={{ fontSize: 11 }}>the setup launcher on your Overview</span></span>
+      </div>
+      <div className="pb" style={{ paddingTop: 12, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 14, flexWrap: "wrap" }}>
+        <p className="muted" style={{ margin: 0, fontSize: 12.5 }}>
+          {done ? "Restored — open the Overview tab and it's back."
+                : "Hidden the getting-started launcher? Bring it back to your Overview."}
+        </p>
+        <button className="btn btn-s" disabled={busy || done} onClick={showAgain}>
+          {busy ? "Restoring…" : done ? "Restored ✓" : "Show on Overview"}
+        </button>
+      </div>
     </div>
   );
 }
