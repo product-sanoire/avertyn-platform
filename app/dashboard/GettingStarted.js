@@ -40,8 +40,9 @@ export function GettingStarted() {
         <span>{prog.pct}%</span>
       </div>
       <div className="gs-body">
-        <div className="gs-title">Finish setting up Avertyn<span className="gs-count">{prog.done}/{prog.total} steps</span></div>
-        <div className="gs-next">{prog.next ? <>Up next: <b>{prog.next.title}</b> — about {prog.remainMin} min left</> : "Almost there"}</div>
+        <div className="gs-title">Finish setting up Avertyn <span className="gs-count">{prog.done} of {prog.total} steps</span></div>
+        <div className="gs-next">{prog.next ? <>Up next <b>{prog.next.title}</b> · about {prog.remainMin} min left</> : "Almost there"}</div>
+        <div className="gs-bar"><i style={{ width: `${prog.pct}%` }} /></div>
       </div>
       <div className="gs-actions">
         <button className="gs-resume" onClick={(e) => { e.stopPropagation(); router.push("/onboarding"); }}>Resume setup →</button>
