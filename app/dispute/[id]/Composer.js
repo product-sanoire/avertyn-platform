@@ -14,6 +14,17 @@ const KIND_LABEL = {
   position_statement: "Position statement",
   open_negotiation: "Open-negotiation notice",
   offer_letter: "Settlement offer",
+  idr_initiation_response: "Response to IDR initiation",
+  idre_conflict_objection: "IDRE conflict objection",
+  extension_request: "Extension request",
+  idre_info_response: "IDRE information response",
+  batching_objection: "Batching objection",
+  qpa_disclosure: "QPA disclosure",
+  award_remittance: "Award remittance",
+  cms_complaint_response: "Complaint response",
+  cost_share_correction: "Cost-share correction",
+  member_protection_notice: "Member protection notice",
+  state_redirection: "State-process redirection",
 };
 
 export default function Composer({ dispute }) {
@@ -454,7 +465,7 @@ function QField({ q, value, onChange, ai, aiBusy }) {
       <div>
         <textarea className="dsel" value={value ?? ""} onChange={(e) => onChange(e.target.value)} rows={4}
           style={{ padding: "8px 10px", width: "100%", resize: "vertical", fontFamily: "inherit" }} />
-        {ai && <button className="mini" disabled={aiBusy} onClick={ai} style={{ marginTop: 6 }}>{aiBusy ? "Drafting…" : "✨ AI draft"}</button>}
+        {ai && <button className="mini" disabled={aiBusy} onClick={ai} style={{ marginTop: 6 }}>{aiBusy ? "Drafting…" : "AI draft"}</button>}
       </div>
     );
   }
