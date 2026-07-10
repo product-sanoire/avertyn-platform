@@ -6,6 +6,7 @@ import { money, untilLabel, caseIdentity } from "../../lib/format";
 import { PredictionsView } from "./ops";
 import { WorkspaceHub } from "./workspace";
 import { InitiatorsView } from "./tiera";
+import { LiveIntelligenceView } from "./intel";
 import { ImportHub } from "./import";
 import { CommandPalette } from "./palette";
 import { FilingView } from "./filing";
@@ -16,7 +17,7 @@ import { WorkspaceSwitcher } from "./WorkspaceSwitcher";
 import Claims from "../dispute/[id]/Claims";
 
 const TABS = ["Overview", "Cases", "Intelligence", "Workspace", "Filing", "Admin"];
-const INTEL = [["initiators", "Initiators & IDREs"], ["exposure", "Employer exposure"]];
+const INTEL = [["initiators", "Initiators & IDREs"], ["exposure", "Employer exposure"], ["live", "Live intelligence"]];
 const STAGES = [["all", "All"], ["due", "Due soon"], ["incoming", "Incoming"], ["eligibility", "Eligibility"], ["qpa", "QPA defense"], ["respond", "Respond & pay"]];
 const mkg = { pass: ["pass", "✓"], fail: ["fail", "×"], warn: ["warn", "!"], na: ["na", "–"] };
 
@@ -455,13 +456,17 @@ export default function Dashboard() {
               <h1 className="vh">Your leverage</h1>
               <span className="sub">{intel === "exposure"
                 ? "What IDR is costing each plan sponsor — the view your brokers distribute"
+                : intel === "live"
+                ? "Every number computed live by Avertyn's engines on your real disputes — transparent QPA, game-theoretic negotiation, peer benchmarks and flat-fee ROI. Nothing hardcoded, no black box"
                 : "Who's filing against your plans, how weak their filings are, and how each IDRE behaves — your negotiation leverage"}</span>
             </div>
             <div className="seg">
               {INTEL.map(([k, l]) => <button key={k} className={intel === k ? "on" : ""} onClick={() => setIntel(k)}>{l}</button>)}
             </div>
           </div>
-          {intel === "exposure" ? <ExposureView exposure={exposure} embedded /> : <InitiatorsView orgId={orgId} onErr={setErr} embedded />}
+          {intel === "exposure" ? <ExposureView exposure={exposure} embedded />
+            : intel === "live" ? <LiveIntelligenceView orgId={orgId} onErr={setErr} embedded />
+            : <InitiatorsView orgId={orgId} onErr={setErr} embedded />}
         </div>
       ) : tab === 3 ? (
         <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "auto", minHeight: 0 }}>
