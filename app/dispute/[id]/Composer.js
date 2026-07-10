@@ -25,6 +25,13 @@ const KIND_LABEL = {
   cost_share_correction: "Cost-share correction",
   member_protection_notice: "Member protection notice",
   state_redirection: "State-process redirection",
+  comprehensive_brief: "Comprehensive IDR brief",
+  eligibility_brief: "Eligibility brief",
+  qpa_brief: "QPA / payment-amount brief",
+  idr_cover_letter: "IDR cover letter",
+  settlement_closure_notice: "Settlement closure notice",
+  general_letter: "General letter",
+  case_packet: "Filing packet",
 };
 
 export default function Composer({ dispute }) {
@@ -33,6 +40,8 @@ export default function Composer({ dispute }) {
   const [view, setView] = useState("list");      // list | wizard | editor
   const [err, setErr] = useState("");
   const [busy, setBusy] = useState("");
+  const [packetOpen, setPacketOpen] = useState(false);
+  const [packetSigner, setPacketSigner] = useState("");
 
   const loadDocs = useCallback(async () => {
     if (!id) return;
@@ -152,6 +161,35 @@ export default function Composer({ dispute }) {
     openEditor(data);          // data = new doc uuid
   }
 
+  // ---- one-click filing packet: auto-assembles the right templates into one brief ----
+  async function assemblePacket() {
+    if (!packetSigner.trim()) { setErr("Enter a signer name for the packet."); return; }
+    setBusy("packet"); setErr("");
+    const { data, error } = await supabase.rpc("assemble_case_packet", {
+      p_dispute: id,
+      p_answers: { signer_name: packetSigner.trim(), signer_title: "Authorized Plan Representative" },
+    });
+    setBusy("");
+    if (error) { setErr(error.message); return; }
+    setPacketOpen(false); setPacketSigner("");
+    await loadDocs();
+    openEditor(data);          // data = new packet doc uuid
+  }
+
+  // ---- exhibits: server merges scanned evidence into one page-numbered PDF ----
+  async function downloadExhibits() {
+    setBusy("exhibits"); setErr("");
+    try {
+      const { data, error } = await supabase.functions.invoke("export-exhibits", { body: { dispute_id: id } });
+      if (error) throw error;
+      if (data?.ok && data.url) window.open(data.url, "_blank");
+      else setErr(data?.reason || "Could not build the exhibits PDF.");
+    } catch (e) {
+      setErr("Exhibits export unavailable: " + (e.message || e));
+    }
+    setBusy("");
+  }
+
   // ---- editor state ----
   const [doc, setDoc] = useState(null);          // full doc from get_document
   const [signer, setSigner] = useState("");
@@ -243,7 +281,23 @@ export default function Composer({ dispute }) {
           <span className="muted" style={{ fontSize: 12.5 }}>
             {docs.length} document{docs.length === 1 ? "" : "s"} · generated from templates, editable, e-signable
           </span>
-          <button className="btn btn-a" onClick={openWizard}>+ New from template</button>
+          <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+            {packetOpen ? (
+              <>
+                <input className="dsel" placeholder="Signer name" value={packetSigner}
+                  onChange={(e) => setPacketSigner(e.target.value)} style={{ padding: "8px 10px", minWidth: 150 }} />
+                <button className="btn btn-a" disabled={busy === "packet"} onClick={assemblePacket}>
+                  {busy === "packet" ? "Assembling…" : "Build packet →"}
+                </button>
+                <button className="mini" onClick={() => { setPacketOpen(false); setPacketSigner(""); }}>Cancel</button>
+              </>
+            ) : (
+              <button className="btn btn-s" onClick={() => setPacketOpen(true)} title="Auto-assemble the arguments that fit this case into one multi-section brief">
+                ⤓ One-click filing packet
+              </button>
+            )}
+            <button className="btn btn-a" onClick={openWizard}>+ New from template</button>
+          </div>
         </div>
         {docs.length === 0 ? (
           <p className="muted" style={{ padding: "12px 0" }}>No documents yet. Generate an argument document from a template — it auto-fills from this case.</p>
@@ -272,11 +326,19 @@ export default function Composer({ dispute }) {
         {/* Evidence — upload existing case documents; AI scans them into the argument */}
         <div className="rlabel" style={{ marginTop: 20, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
           <span>Evidence &amp; exhibits</span>
-          <label className="mini" style={{ cursor: "pointer" }}>
-            {evBusy ? "Uploading…" : "+ Upload document"}
-            <input type="file" accept=".pdf,.png,.jpg,.jpeg,.webp,.txt" style={{ display: "none" }}
-              disabled={evBusy} onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ""; uploadEvidence(f); }} />
-          </label>
+          <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+            {evidence.some((ev) => ev.status === "scanned") && (
+              <button className="mini" disabled={busy === "exhibits"} onClick={downloadExhibits}
+                title="Merge every scanned document into one page-numbered exhibit bundle">
+                {busy === "exhibits" ? "Building…" : "⤓ Exhibits PDF"}
+              </button>
+            )}
+            <label className="mini" style={{ cursor: "pointer" }}>
+              {evBusy ? "Uploading…" : "+ Upload document"}
+              <input type="file" accept=".pdf,.png,.jpg,.jpeg,.webp,.txt" style={{ display: "none" }}
+                disabled={evBusy} onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ""; uploadEvidence(f); }} />
+            </label>
+          </div>
         </div>
         {evidence.length === 0 ? (
           <p className="muted" style={{ fontSize: 12 }}>Upload the open-negotiation notice, EOB/remittance, the initiator's filing, or contracts. Claude scans each and, once scanned, it's cited as an exhibit and folded into the AI-drafted argument.</p>
@@ -498,6 +560,7 @@ const DOC_CSS = `
   table.bench td{border-bottom:1px solid #ddd;padding:6px 8px}
   ul.exhibits{margin:6px 0 14px 20px}ul.exhibits li{margin:0 0 6px}
   h3{font-size:16px;margin:16px 0 8px}
+  .page-break{page-break-before:always;break-before:page}
   .foot{margin-top:26px;padding-top:8px;border-top:1px solid #ccc;color:#8a857f;font-size:10.5px;font-family:Arial,sans-serif;display:flex;justify-content:space-between}
   @media print{body{margin:0 auto}}`;
 function letterhead(org) {

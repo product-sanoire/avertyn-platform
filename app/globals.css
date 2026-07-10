@@ -498,3 +498,5 @@ input,select,textarea{color:var(--ink);font-family:inherit}
 /* Evidence exhibits list (rendered in documents + exports handled inline) */
 .doc-preview ul.exhibits,.doc-editor ul.exhibits{margin:6px 0 14px 20px}
 .doc-preview ul.exhibits li,.doc-editor ul.exhibits li{margin:0 0 6px}
+.doc-preview .page-break,.doc-editor .page-break{display:block;border-top:2px dashed var(--line-2);margin:24px 0;height:0}
+.doc-preview .page-break::after,.doc-editor .page-break::after{content:"page break";display:block;text-align:center;font-family:var(--sans);font-size:9px;letter-spacing:.14em;text-transform:uppercase;color:var(--mut);margin-top:-7px;background:var(--card);width:72px;margin-left:auto;margin-right:auto}
