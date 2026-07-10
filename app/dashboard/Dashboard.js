@@ -11,6 +11,7 @@ import { CommandPalette } from "./palette";
 import { FilingView } from "./filing";
 import { AdminView } from "./admin";
 import { ExplainModal } from "./explain";
+import { GettingStarted } from "./GettingStarted";
 import Claims from "../dispute/[id]/Claims";
 
 const TABS = ["Overview", "Cases", "Intelligence", "Workspace", "Filing", "Admin"];
@@ -107,6 +108,7 @@ export default function Dashboard() {
   const [err, setErr] = useState("");
   const loadedOnce = useRef(false);
   const selRef = useRef(null);
+  const obRef = useRef(false);
 
   // ---- data loading --------------------------------------------------------
   const loadShell = useCallback(async () => {
@@ -204,6 +206,30 @@ export default function Dashboard() {
     window.addEventListener("keydown", h);
     return () => window.removeEventListener("keydown", h);
   }, []);
+  // Deep links (used by onboarding + notifications): /?tab=admin, /?open=import
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const p = new URLSearchParams(window.location.search);
+    const map = { overview: 0, cases: 1, intelligence: 2, workspace: 3, filing: 4, admin: 5 };
+    const t = p.get("tab");
+    if (t && map[t] != null) setTab(map[t]);
+    if (p.get("open") === "import") setImportOpen(true);
+  }, []);
+  // First run: a brand-new, empty operator is taken straight into guided setup
+  // (once). Skipping or finishing sets a flag so this never fires again.
+  useEffect(() => {
+    if (!orgId || obRef.current) return;
+    obRef.current = true;
+    (async () => {
+      try {
+        const { data } = await supabase.rpc("onboarding_state");
+        if (data && data.ok && !data.onboarded_at && !(data.onboarding && data.onboarding.dismissed)) {
+          const sig = data.signals || {};
+          if ((sig.plans || 0) === 0 && (sig.disputes || 0) === 0) router.push("/onboarding");
+        }
+      } catch (_) {}
+    })();
+  }, [orgId, router]);
   useEffect(() => { if (rows.length && !sel) setSel(rows[0].id); }, [rows, sel]);
   useEffect(() => { selRef.current = sel; if (sel) loadDetail(sel); }, [sel, loadDetail]);
 
@@ -417,6 +443,7 @@ export default function Dashboard() {
 
       {tab === 0 ? (
         <div style={{ flex: 1, overflow: "auto", padding: 22 }}>
+          <GettingStarted />
           <CommandCenter metrics={metrics} score={score} awardsM={awardsM} agentM={agentM}
             scorecard={scorecard} gap={gap} onVerify={verifyLedger} onExport={exportData}
             onAutopilot={runAutopilot} busy={busy} verify={verify}
