@@ -8,7 +8,8 @@ import { InitiatorsView, DeadlinesView, IntegrationsView } from "./tiera";
 import { ImportHub } from "./import";
 import { CommandPalette } from "./palette";
 
-const TABS = ["Overview", "Disputes", "Deadlines", "Initiators", "Exposure", "Predictions", "Inbox", "Tasks", "Calendar", "Integrations"];
+const TABS = ["Overview", "Disputes", "Deadlines", "Intelligence", "Inbox", "Tasks", "Calendar", "Integrations"];
+const INTEL = [["initiators", "Initiators & IDREs"], ["exposure", "Employer exposure"], ["predictions", "Predictions"]];
 const STAGES = [["all", "All"], ["incoming", "Incoming"], ["eligibility", "Eligibility"], ["qpa", "QPA defense"], ["respond", "Respond & pay"]];
 const mkg = { pass: ["pass", "✓"], fail: ["fail", "×"], warn: ["warn", "!"], na: ["na", "–"] };
 
@@ -21,6 +22,19 @@ const ACTION_LABEL = {
 };
 const MODES = ["off", "suggest", "review", "auto"];
 const MONEY = new Set(["settle", "schedule_payment"]);
+
+// CSV export helper (reporting).
+function downloadCSV(name, rows, cols) {
+  const esc = (v) => { const s = v == null ? "" : String(v); return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; };
+  const csv = [cols.map((c) => c.h).join(","), ...rows.map((r) => cols.map((c) => esc(c.f(r))).join(","))].join("\n");
+  const url = URL.createObjectURL(new Blob([csv], { type: "text/csv" }));
+  const a = document.createElement("a"); a.href = url; a.download = name; a.click(); URL.revokeObjectURL(url);
+}
+const DISPUTE_CSV_COLS = [
+  { h: "ref", f: (r) => r.external_ref }, { h: "initiator", f: (r) => r.initiators?.name }, { h: "plan", f: (r) => r.plans?.name },
+  { h: "cpt", f: (r) => r.cpt_code }, { h: "demand", f: (r) => r.demand_amount }, { h: "qpa", f: (r) => r.qpa_amount },
+  { h: "eligibility_score", f: (r) => r.eligibility_score }, { h: "state", f: (r) => r.workflow_state }, { h: "disposition", f: (r) => r.disposition },
+];
 
 export default function Dashboard() {
   const router = useRouter();
@@ -49,6 +63,7 @@ export default function Dashboard() {
   const [moneyRel, setMoneyRel] = useState(null);
   const [tab, setTab] = useState(0);
   const [stage, setStage] = useState("all");
+  const [intel, setIntel] = useState("initiators");
   const [busy, setBusy] = useState("");
   const [verify, setVerify] = useState(null);
   const [err, setErr] = useState("");
@@ -251,30 +266,27 @@ export default function Dashboard() {
           <DeadlinesView orgId={orgId} onErr={setErr} />
         </div>
       ) : tab === 3 ? (
-        <div style={{ flex: 1, overflow: "auto", padding: 22 }}>
-          <InitiatorsView orgId={orgId} onErr={setErr} />
+        <div style={{ flex: 1, overflow: "auto", padding: "20px 26px" }}>
+          <div className="seg" style={{ marginBottom: 8 }}>
+            {INTEL.map(([k, l]) => <button key={k} className={intel === k ? "on" : ""} onClick={() => setIntel(k)}>{l}</button>)}
+          </div>
+          {intel === "initiators" ? <InitiatorsView orgId={orgId} onErr={setErr} />
+            : intel === "exposure" ? <ExposureView exposure={exposure} />
+            : <PredictionsView onErr={setErr} onOpen={(id) => { setSel(id); setTab(1); setStage("all"); }} />}
         </div>
       ) : tab === 4 ? (
-        <div style={{ flex: 1, overflow: "auto", padding: 22 }}>
-          <ExposureView exposure={exposure} />
-        </div>
-      ) : tab === 5 ? (
-        <div style={{ flex: 1, overflow: "auto", padding: 22 }}>
-          <PredictionsView onErr={setErr} onOpen={(id) => { setSel(id); setTab(1); setStage("all"); }} />
-        </div>
-      ) : tab === 6 ? (
         <div style={{ flex: 1, overflow: "hidden" }}>
           <InboxView email={email} orgId={orgId} onErr={setErr} />
         </div>
-      ) : tab === 7 ? (
+      ) : tab === 5 ? (
         <div style={{ flex: 1, overflow: "auto", padding: 22 }}>
           <TasksView email={email} orgId={orgId} userId={userId} onErr={setErr} />
         </div>
-      ) : tab === 8 ? (
+      ) : tab === 6 ? (
         <div style={{ flex: 1, overflow: "auto", padding: 22 }}>
           <CalendarView onErr={setErr} />
         </div>
-      ) : tab === 9 ? (
+      ) : tab === 7 ? (
         <div style={{ flex: 1, overflow: "auto", padding: 22 }}>
           <IntegrationsView onErr={setErr} />
         </div>
@@ -287,7 +299,10 @@ export default function Dashboard() {
                 <button key={k} className={stage === k ? "on" : ""} onClick={() => setStage(k)}>{label}</button>
               ))}
             </div>
-            <span className="muted" style={{ marginLeft: "auto", fontSize: 12.5 }}>{filtered.length} in view</span>
+            <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 10 }}>
+              <span className="muted" style={{ fontSize: 12.5 }}>{filtered.length} in view</span>
+              <button className="mini" onClick={() => downloadCSV("avertyn-disputes.csv", filtered, DISPUTE_CSV_COLS)}>Export CSV</button>
+            </div>
           </div>
           <div className="work" style={{ flex: 1 }}>
           <div className="list">
