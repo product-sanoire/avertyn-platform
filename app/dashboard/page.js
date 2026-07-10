@@ -152,6 +152,21 @@ export default function Dashboard() {
   }, []);
 
   useEffect(() => { loadShell(); }, [loadShell]);
+  // Self-heal: signed in but not yet mapped to an org (brand-new user, or access
+  // just granted). Realtime channels are gated on orgId, so with no org there's
+  // nothing to subscribe to — poll the bootstrap until an org appears, then the
+  // dashboard fills in and subscribes on its own. No manual refresh needed.
+  useEffect(() => {
+    if (orgId || !userId) return;
+    const t = setInterval(() => { loadShell(); }, 4000);
+    return () => clearInterval(t);
+  }, [orgId, userId, loadShell]);
+  // Refetch when the tab regains focus so a long-idle tab is never stale.
+  useEffect(() => {
+    const onVis = () => { if (document.visibilityState === "visible") loadShell(); };
+    document.addEventListener("visibilitychange", onVis);
+    return () => document.removeEventListener("visibilitychange", onVis);
+  }, [loadShell]);
   useEffect(() => {
     const h = (e) => { if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") { e.preventDefault(); setPaletteOpen((o) => !o); } };
     window.addEventListener("keydown", h);
