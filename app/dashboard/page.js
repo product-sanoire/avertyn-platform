@@ -52,6 +52,8 @@ const DISPUTE_CSV_COLS = [
   { h: "ref", f: (r) => r.external_ref }, { h: "initiator", f: (r) => r.initiators?.name }, { h: "plan", f: (r) => r.plans?.name },
   { h: "cpt", f: (r) => r.cpt_code }, { h: "demand", f: (r) => r.demand_amount }, { h: "qpa", f: (r) => r.qpa_amount },
   { h: "eligibility_score", f: (r) => r.eligibility_score }, { h: "state", f: (r) => r.workflow_state }, { h: "disposition", f: (r) => r.disposition },
+  { h: "phase", f: (r) => (r.phase === "idr" ? "IDR" : "open_negotiation") },
+  { h: "claim_number", f: (r) => r.claim_number }, { h: "dispute_number", f: (r) => r.idr_registration_number },
 ];
 
 export default function Dashboard() {
@@ -88,6 +90,7 @@ export default function Dashboard() {
   const [dispSort, setDispSort] = useState("deadline");
   const [dispQuery, setDispQuery] = useState("");
   const [briefFilter, setBriefFilter] = useState("all");   // all | draft | in_review | approved | filed | sealed | none
+  const [phaseFilter, setPhaseFilter] = useState("all");   // all | open_negotiation | idr
   const [selected, setSelected] = useState(() => new Set());
   const [ws, setWs] = useState("inbox");
   const [busy, setBusy] = useState("");
@@ -107,7 +110,7 @@ export default function Dashboard() {
       setOrgId(me?.org_id || null);
 
       const res = await Promise.all([
-        supabase.from("disputes").select("id, external_ref, cpt_code, demand_amount, qpa_amount, workflow_state, disposition, eligibility_score, respond_by, pay_by, plans(name), initiators(name)").order("respond_by", { ascending: true, nullsFirst: false }),
+        supabase.from("disputes").select("id, external_ref, cpt_code, demand_amount, qpa_amount, workflow_state, disposition, eligibility_score, respond_by, pay_by, phase, claim_number, idr_registration_number, plans(name), initiators(name)").order("respond_by", { ascending: true, nullsFirst: false }),
         supabase.from("org_metrics").select("*").maybeSingle(),
         supabase.from("org_scorecard").select("*").maybeSingle(),
         supabase.from("awards_metrics").select("*").maybeSingle(),
@@ -308,10 +311,13 @@ export default function Dashboard() {
     return rows;
   })();
   const tabHeader = STAGES.find((s) => s[0] === stage)?.[1] || "All";
+  const phaseOf = (r) => (r.phase === "idr" ? "idr" : "open_negotiation");
+  const phaseCounts = rows.reduce((m, r) => { const p = phaseOf(r); m[p] = (m[p] || 0) + 1; return m; }, {});
   const displayed = (() => {
     let arr = filtered;
     const q = dispQuery.trim().toLowerCase();
-    if (q) arr = arr.filter((r) => (r.external_ref || "").toLowerCase().includes(q) || (r.initiators?.name || "").toLowerCase().includes(q) || (r.cpt_code || "").toLowerCase().includes(q));
+    if (q) arr = arr.filter((r) => (r.external_ref || "").toLowerCase().includes(q) || (r.initiators?.name || "").toLowerCase().includes(q) || (r.cpt_code || "").toLowerCase().includes(q) || (r.claim_number || "").toLowerCase().includes(q) || (r.idr_registration_number || "").toLowerCase().includes(q));
+    if (phaseFilter !== "all") arr = arr.filter((r) => phaseOf(r) === phaseFilter);
     if (briefFilter !== "all") {
       arr = arr.filter((r) => {
         const b = briefMap[r.id];
@@ -455,6 +461,11 @@ export default function Dashboard() {
                 <button key={k} className={stage === k ? "on" : ""} onClick={() => setStage(k)}>{label}</button>
               ))}
             </div>
+            <div className="seg" title="Filter by case phase">
+              <button className={phaseFilter === "all" ? "on" : ""} onClick={() => setPhaseFilter("all")}>All phases</button>
+              <button className={phaseFilter === "open_negotiation" ? "on" : ""} onClick={() => setPhaseFilter("open_negotiation")}>Open neg. ({phaseCounts.open_negotiation || 0})</button>
+              <button className={phaseFilter === "idr" ? "on" : ""} onClick={() => setPhaseFilter("idr")}>IDR ({phaseCounts.idr || 0})</button>
+            </div>
             {selected.size > 0 && (
               <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                 <span className="badge b-ink">{selected.size} selected</span>
@@ -510,6 +521,11 @@ export default function Dashboard() {
                       </div>
                       <div className="r2" style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
                         <span>{r.initiators?.name || "—"} · {money(r.demand_amount)} · {r.workflow_state}</span>
+                        {(() => { const idr = phaseOf(r) === "idr"; const lead = idr ? r.idr_registration_number : r.claim_number; return (
+                          <span className={"badge b-" + (idr ? "green" : "amber")} title={idr ? "Federal IDR" : "Open negotiation"}>
+                            <i className={"dot d-" + (idr ? "green" : "amber")} />{idr ? "IDR" : "Open neg."}{lead ? " · " + lead : ""}
+                          </span>
+                        ); })()}
                         {briefMap[r.id] && (
                           <span className={"badge b-" + (DOC_STATUS_TONE[briefMap[r.id].status] || "grey")} title="Furthest-along brief status on this case">
                             <i className={"dot d-" + (DOC_STATUS_TONE[briefMap[r.id].status] || "grey")} />
@@ -809,6 +825,11 @@ function Detail({ dd, onRun, onDoc, onOpenNeg, onAction, onStageMoney, onView, o
   return (
     <div>
       <div className="dh"><h1>#{d.external_ref}</h1>
+        {(() => { const idr = d.phase === "idr"; const lead = idr ? d.idr_registration_number : d.claim_number; return (
+          <span className={"badge b-" + (idr ? "green" : "amber")} style={{ marginLeft: 10 }} title="Case phase">
+            <i className={"dot d-" + (idr ? "green" : "amber")} />{idr ? "Federal IDR" : "Open negotiation"}{lead ? " · " + lead : ""}
+          </span>
+        ); })()}
         <span className="sub">{d.initiators?.name} · CPT {d.cpt_code} · {d.plans?.name} · {d.workflow_state}</span>
         {d.win_prob != null && (() => { const wp = Math.round(Number(d.win_prob) * 100); const tone = wp >= 60 ? "sage" : wp >= 40 ? "amber" : "red"; return <span className={"badge b-" + tone} style={{ marginLeft: 10 }} title="Modeled plan-prevail probability — open Explain for the full driver breakdown"><i className={"dot d-" + tone} />{wp}% win</span>; })()}
         {briefBest.s && <span className={"badge b-" + (DOC_STATUS_TONE[briefBest.s] || "grey")} style={{ marginLeft: 10 }} title="Furthest-along brief status on this case"><i className={"dot d-" + (DOC_STATUS_TONE[briefBest.s] || "grey")} />Brief: {DOC_STATUS_LABEL[briefBest.s] || "Draft"}</span>}
