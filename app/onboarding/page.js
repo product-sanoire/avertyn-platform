@@ -8,7 +8,7 @@ import { useRouter } from "next/navigation";
 import { supabase } from "../../lib/supabaseClient";
 import { TIERS, GROUPS, stepsForTier, stepDone, progressFor } from "./steps";
 
-const KINDS = ["Third-party administrator", "Plan administrator", "Self-funded employer", "Broker / consultant", "Health plan"];
+const KINDS = [["tpa", "Third-party administrator"], ["plan_admin", "Plan administrator"], ["broker", "Broker / consultant"]];
 const ROLES = ["admin", "manager", "analyst", "auditor", "viewer"];
 
 export default function Onboarding() {
@@ -19,7 +19,7 @@ export default function Onboarding() {
   const [err, setErr] = useState("");
   const [open, setOpen] = useState(null);            // expanded step key
   const [tierOpen, setTierOpen] = useState(false);
-  const [company, setCompany] = useState({ name: "", kind: KINDS[0] });
+  const [company, setCompany] = useState({ name: "", kind: "tpa" });
   const [planF, setPlanF] = useState({ name: "", plan_type: "", employer: "" });
   const [teamF, setTeamF] = useState({ email: "", full_name: "", role: "analyst" });
   const mounted = useRef(false);
@@ -32,7 +32,7 @@ export default function Onboarding() {
       if (error) throw error;
       if (data?.ok === false) { setErr("No workspace is linked to your account yet."); setLoading(false); return; }
       setSt(data);
-      if (!mounted.current) { setCompany((c) => ({ ...c, name: data.org?.name || "", kind: data.org?.kind || KINDS[0] })); mounted.current = true; }
+      if (!mounted.current) { setCompany((c) => ({ ...c, name: data.org?.name || "", kind: data.org?.kind || "tpa" })); mounted.current = true; }
       setLoading(false);
     } catch (e) { setErr(e.message || String(e)); setLoading(false); }
   }, [router]);
@@ -186,7 +186,7 @@ export default function Onboarding() {
                         {step.kind === "inline" && step.key === "company" && (
                           <div className="onb-form">
                             <label>Legal name<input value={company.name} onChange={(e) => setCompany({ ...company, name: e.target.value })} placeholder="Acme Plan Administrators, LLC" /></label>
-                            <label>Operator type<select value={company.kind} onChange={(e) => setCompany({ ...company, kind: e.target.value })}>{KINDS.map((k) => <option key={k} value={k}>{k}</option>)}</select></label>
+                            <label>Operator type<select value={company.kind} onChange={(e) => setCompany({ ...company, kind: e.target.value })}>{KINDS.map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select></label>
                             <button className="onb-btn" disabled={busy === "company"} onClick={saveCompany}>{busy === "company" ? "Saving…" : "Save"}</button>
                           </div>
                         )}

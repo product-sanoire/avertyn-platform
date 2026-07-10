@@ -12,6 +12,7 @@ import { FilingView } from "./filing";
 import { AdminView } from "./admin";
 import { ExplainModal } from "./explain";
 import { GettingStarted } from "./GettingStarted";
+import { WorkspaceSwitcher } from "./WorkspaceSwitcher";
 import Claims from "../dispute/[id]/Claims";
 
 const TABS = ["Overview", "Cases", "Intelligence", "Workspace", "Filing", "Admin"];
@@ -413,10 +414,7 @@ export default function Dashboard() {
           <span className="brandmark" role="img" aria-label="Avertyn">
             <svg viewBox="0 0 512 512"><rect width="512" height="512" rx="112" fill="#141414" /><g fill="none" stroke="#F5F4F2" strokeWidth="44" strokeLinecap="butt" strokeLinejoin="round"><path d="M172 374 L244 196" /><path d="M340 374 L268 196" /></g><circle cx="256" cy="182" r="27" fill="#B23A2A" /></svg>
           </span>
-          <button className="switch2" title="Meridian Plan Administrators">
-            <span className="col"><span className="eb">Workspace</span><span className="nm">Meridian Plan Administrators</span></span>
-            <span className="cv">⌄</span>
-          </button>
+          <WorkspaceSwitcher fallback="Workspace" />
         </div>
         <div className="searchc">
           <div className="search2" title="Search & commands" onClick={() => setPaletteOpen(true)}>
