@@ -4,6 +4,7 @@
 //   re-selectable) → file the submission. Every step is a ledgered batch action.
 import { useEffect, useState, useCallback } from "react";
 import { supabase } from "../../lib/supabaseClient";
+import { useLive } from "../../lib/useLive";
 import { money } from "../../lib/format";
 
 const STATUS_TONE = { draft: "grey", idre_pending: "amber", filed: "green" };
@@ -39,6 +40,7 @@ export function FilingView({ orgId, onErr, initialBatch, onConsumeInitial }) {
     } catch (er) { onErr(er.message); }
   }, [onErr]);
   useEffect(() => { load(); }, [load]);
+  useLive("filing", ["batches", "batch_disputes", "idre_selections", "portal_submissions"], load);
   // Preselect a batch handed over from the Cases queue ("Batch & file").
   useEffect(() => { if (initialBatch) { setSel(initialBatch); onConsumeInitial && onConsumeInitial(); } }, [initialBatch]); // eslint-disable-line react-hooks/exhaustive-deps
 

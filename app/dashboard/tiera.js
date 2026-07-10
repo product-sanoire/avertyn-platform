@@ -6,6 +6,7 @@
 // Self-contained (org-scoped via RLS). Reuses the Ink & Paper component classes.
 import { useEffect, useState, useCallback } from "react";
 import { supabase } from "../../lib/supabaseClient";
+import { useLive } from "../../lib/useLive";
 import { money, untilLabel } from "../../lib/format";
 
 const API_BASE = (process.env.NEXT_PUBLIC_SUPABASE_URL || "https://ssjougrsaecdwfuxeasd.supabase.co") + "/functions/v1/eligibility-prescreen";
@@ -29,6 +30,7 @@ export function InitiatorsView({ orgId, onErr, embedded }) {
     } catch (e) { onErr(e.message); }
   }, [orgId, onErr]);
   useEffect(() => { load(); }, [load]);
+  useLive("initiators", ["disputes", "idre_selections", "awards"], load);
 
   const totDisputes = rows.reduce((a, r) => a + Number(r.disputes || 0), 0);
   const totChallenged = rows.reduce((a, r) => a + Number(r.challenged || 0), 0);
@@ -130,6 +132,7 @@ export function DeadlinesView({ orgId, onErr, embedded }) {
     } catch (e) { onErr(e.message); }
   }, [onErr]);
   useEffect(() => { load(); }, [load]);
+  useLive("deadlines", ["deadlines", "notification_outbox", "notifications"], load);
 
   async function scanAlerts() {
     setBusy("scan"); setNote("");

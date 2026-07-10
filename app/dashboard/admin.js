@@ -5,6 +5,7 @@
 //   • Integrations — the eligibility pre-screen API (reused Tier-A view)
 import { useEffect, useState, useCallback } from "react";
 import { supabase } from "../../lib/supabaseClient";
+import { useLive } from "../../lib/useLive";
 import { IntegrationsView, DeadlinesView } from "./tiera";
 
 const ROLES = ["admin", "manager", "analyst", "auditor", "viewer"];
@@ -69,6 +70,7 @@ function AccessView({ orgId, onErr }) {
     } catch (e) { onErr(e.message); }
   }, [onErr]);
   useEffect(() => { load(); }, [load]);
+  useLive("access", ["app_users", "scim_tokens", "sso_connections"], load);
 
   const setF = (k, v) => setForm((f) => ({ ...f, [k]: v }));
   async function saveSso() {
@@ -237,6 +239,7 @@ function ReportsView({ orgId, onErr }) {
     catch (e) { onErr(e.message); }
   }, [onErr]);
   useEffect(() => { load(); }, [load]);
+  useLive("reports", ["scheduled_reports"], load);
 
   useEffect(() => {
     let live = true;

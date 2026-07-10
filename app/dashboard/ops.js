@@ -4,6 +4,7 @@
 // dashboard file stays lean. Reuses the Ink & Paper component classes.
 import { useEffect, useState, useCallback } from "react";
 import { supabase } from "../../lib/supabaseClient";
+import { useLive } from "../../lib/useLive";
 import { money } from "../../lib/format";
 
 const PRIO = { urgent: "red", high: "amber", med: "ink", low: "grey" };
@@ -36,6 +37,11 @@ export function InboxView({ email, orgId, onErr }) {
 
   useEffect(() => { loadThreads(); }, [loadThreads]);
   useEffect(() => { if (active) openThread(active); /* eslint-disable-next-line */ }, [active]);
+  // Live: new threads/messages arrive without a refresh.
+  useLive("inbox", ["comm_threads", "comm_messages"], () => {
+    loadThreads();
+    if (active) supabase.from("comm_messages").select("*").eq("thread_id", active).order("at", { ascending: true }).then(({ data }) => setMsgs(data || []));
+  });
 
   async function send() {
     if (!reply.trim() || !active) return;
@@ -104,6 +110,7 @@ export function TasksView({ email, orgId, userId, onErr, embedded }) {
     setTasks(data || []);
   }, [onErr]);
   useEffect(() => { load(); }, [load]);
+  useLive("tasks", ["work_items"], load);
 
   async function toggle(t) {
     const done = t.status === "done";
@@ -185,6 +192,7 @@ export function CalendarView({ onErr, embedded }) {
     ].filter((x) => x.at));
   }, [onErr]);
   useEffect(() => { load(); }, [load]);
+  useLive("calendar", ["calendar_events", "deadlines"], load);
 
   const base = new Date(); base.setDate(1); base.setMonth(base.getMonth() + offset);
   const year = base.getFullYear(), month = base.getMonth();
@@ -251,6 +259,7 @@ export function PredictionsView({ onErr, onOpen, embedded }) {
     setPreds(latest);
   }, [onErr]);
   useEffect(() => { load(); }, [load]);
+  useLive("predictions", ["predictions"], load);
 
   const avgWin = preds.length ? Math.round(preds.reduce((a, p) => a + Number(p.win_prob || 0), 0) / preds.length * 100) : 0;
   const totalEV = preds.reduce((a, p) => a + Number(p.expected_value || 0), 0);

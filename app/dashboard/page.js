@@ -78,6 +78,7 @@ export default function Dashboard() {
   const [verify, setVerify] = useState(null);
   const [err, setErr] = useState("");
   const loadedOnce = useRef(false);
+  const selRef = useRef(null);
 
   // ---- data loading --------------------------------------------------------
   const loadShell = useCallback(async () => {
@@ -157,11 +158,13 @@ export default function Dashboard() {
     return () => window.removeEventListener("keydown", h);
   }, []);
   useEffect(() => { if (rows.length && !sel) setSel(rows[0].id); }, [rows, sel]);
-  useEffect(() => { if (sel) loadDetail(sel); }, [sel, loadDetail]);
+  useEffect(() => { selRef.current = sel; if (sel) loadDetail(sel); }, [sel, loadDetail]);
 
-  // Realtime: refresh ops slices when the queue, notifications, or ledger move.
+  // Realtime: keep every live slice moving — queue, ledger, disputes, awards,
+  // predictions, and the open case's findings/QPA/offers/documents.
   useEffect(() => {
     if (!orgId) return;
+    const detail = () => { if (selRef.current) loadDetail(selRef.current); };
     const ch = supabase
       .channel("avertyn-ops")
       .on("postgres_changes", { event: "*", schema: "public", table: "approval_queue" }, loadOps)
@@ -169,9 +172,14 @@ export default function Dashboard() {
       .on("postgres_changes", { event: "*", schema: "public", table: "action_log" }, loadOps)
       .on("postgres_changes", { event: "*", schema: "public", table: "disputes" }, loadShell)
       .on("postgres_changes", { event: "*", schema: "public", table: "awards" }, loadShell)
+      .on("postgres_changes", { event: "*", schema: "public", table: "predictions" }, loadShell)
+      .on("postgres_changes", { event: "*", schema: "public", table: "eligibility_findings" }, detail)
+      .on("postgres_changes", { event: "*", schema: "public", table: "qpa_records" }, detail)
+      .on("postgres_changes", { event: "*", schema: "public", table: "offers" }, detail)
+      .on("postgres_changes", { event: "*", schema: "public", table: "documents" }, detail)
       .subscribe();
     return () => { supabase.removeChannel(ch); };
-  }, [orgId, loadOps, loadShell]);
+  }, [orgId, loadOps, loadShell, loadDetail]);
 
   // ---- actions -------------------------------------------------------------
   async function act(name, fn, opts = {}) {
