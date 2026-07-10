@@ -3,7 +3,7 @@ import { useEffect, useState, useCallback } from "react";
 import { useRouter, useParams } from "next/navigation";
 import Link from "next/link";
 import { supabase } from "../../../lib/supabaseClient";
-import { money, untilLabel } from "../../../lib/format";
+import { money, untilLabel, caseIdentity } from "../../../lib/format";
 import IdrPanel from "./IdrPanel";
 import Composer from "./Composer";
 import Claims from "./Claims";
@@ -75,21 +75,16 @@ export default function CaseWorkspace() {
         <Link href="/dashboard" className="muted">← Command center</Link>
 
         <div style={{ display: "flex", alignItems: "baseline", gap: 12, marginTop: 10, flexWrap: "wrap" }}>
-          <h1 style={{ fontFamily: "var(--serif)", fontSize: 28, margin: 0 }}>#{d.external_ref}</h1>
-          {(() => {
-            const idr = d.phase === "idr";
-            const lead = idr
-              ? (d.idr_registration_number ? "Dispute No. " + d.idr_registration_number : null)
-              : (d.claim_number ? "Claim #" + d.claim_number : null);
-            return (
-              <>
-                <span className={"badge b-" + (idr ? "green" : "amber")} title="Case phase">
-                  <i className={"dot d-" + (idr ? "green" : "amber")} />{idr ? "Federal IDR" : "Open negotiation"}
-                </span>
-                {lead && <span className="badge b-ink" style={{ fontFamily: "var(--num,inherit)" }}>{lead}</span>}
-              </>
-            );
-          })()}
+          {(() => { const ci = caseIdentity(d); return (
+            <>
+              <h1 style={{ fontFamily: "var(--serif)", fontSize: 28, margin: 0 }}>{ci.label} {ci.number}</h1>
+              <span className={"badge b-" + (ci.phaseIdr ? "green" : "amber")} title="Case phase">
+                <i className={"dot d-" + (ci.phaseIdr ? "green" : "amber")} />{ci.phaseIdr ? "Federal IDR" : "Open negotiation"}
+              </span>
+              {ci.internal && <span className="badge b-grey" title="Operator internal case number">Internal #{ci.internal}</span>}
+              {!ci.isLegal && <span className="badge b-amber" title="No legal identifier captured yet">Add {ci.phaseIdr ? "dispute" : "claim"} number</span>}
+            </>
+          ); })()}
           <span className="muted">
             {d.initiators?.name} · CPT {d.cpt_code} · {d.plans?.name} · {d.service_category}
           </span>

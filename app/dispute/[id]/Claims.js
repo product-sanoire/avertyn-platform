@@ -18,6 +18,7 @@ export default function Claims({ disputeId, dispute, onIdentifiers }) {
   const [phase, setPhase] = useState(dispute?.phase || "open_negotiation");
   const [claimNo, setClaimNo] = useState(dispute?.claim_number || "");
   const [dispNo, setDispNo] = useState(dispute?.idr_registration_number || "");
+  const [internalRef, setInternalRef] = useState(dispute?.external_ref || "");
   const [adding, setAdding] = useState(false);
   const [form, setForm] = useState({ claim_number: "", patient_ref: "", cpt_code: "", service_date: "", billed_total: "" });
   const [editId, setEditId] = useState(null);
@@ -33,12 +34,13 @@ export default function Claims({ disputeId, dispute, onIdentifiers }) {
     setPhase(dispute?.phase || "open_negotiation");
     setClaimNo(dispute?.claim_number || "");
     setDispNo(dispute?.idr_registration_number || "");
-  }, [dispute?.phase, dispute?.claim_number, dispute?.idr_registration_number]);
+    setInternalRef(dispute?.external_ref || "");
+  }, [dispute?.phase, dispute?.claim_number, dispute?.idr_registration_number, dispute?.external_ref]);
 
   async function saveIdentifiers() {
     setBusy("ids"); setErr("");
     const { data, error } = await supabase.rpc("set_case_identifiers", {
-      p_dispute: disputeId, p_phase: phase, p_claim_number: claimNo || null, p_dispute_number: dispNo || null });
+      p_dispute: disputeId, p_phase: phase, p_claim_number: claimNo || null, p_dispute_number: dispNo || null, p_internal_ref: internalRef });
     setBusy("");
     if (error || data?.ok === false) { setErr(error?.message || data?.reason || "Could not save identifiers."); return; }
     onIdentifiers && onIdentifiers();
@@ -95,6 +97,9 @@ export default function Claims({ disputeId, dispute, onIdentifiers }) {
         </label>
         <label style={{ ...lbl, opacity: isIdr ? 1 : 0.55 }}>Dispute number {isIdr ? "" : "(on IDR)"}
           <input className="dsel" value={dispNo} onChange={(e) => setDispNo(e.target.value)} placeholder="Federal IDR dispute no." style={{ ...fld, display: "block", marginTop: 3, minWidth: 190 }} />
+        </label>
+        <label style={lbl}>Internal case no. <span className="muted" style={{ fontWeight: 400 }}>(optional)</span>
+          <input className="dsel" value={internalRef} onChange={(e) => setInternalRef(e.target.value)} placeholder="your own ref" style={{ ...fld, display: "block", marginTop: 3, minWidth: 140 }} />
         </label>
         <button className="btn btn-a" disabled={busy === "ids"} onClick={saveIdentifiers} style={{ padding: "8px 14px" }}>{busy === "ids" ? "Saving…" : "Save"}</button>
       </div>

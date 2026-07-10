@@ -2,7 +2,7 @@
 import { useEffect, useState, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "../../lib/supabaseClient";
-import { money, untilLabel } from "../../lib/format";
+import { money, untilLabel, caseIdentity } from "../../lib/format";
 import { InboxView, TasksView, CalendarView, PredictionsView } from "./ops";
 import { InitiatorsView } from "./tiera";
 import { ImportHub } from "./import";
@@ -515,17 +515,20 @@ export default function Dashboard() {
                       <div className="r1">
                         <label style={{ display: "flex", alignItems: "center", gap: 8 }} onClick={(e) => e.stopPropagation()}>
                           <input type="checkbox" checked={isSel} onChange={(e) => { const n = new Set(selected); e.target.checked ? n.add(r.id) : n.delete(r.id); setSelected(n); }} />
-                          <b>#{r.external_ref}</b>
+                          <b>{caseIdentity(r).number}</b>
                         </label>
                         <span className="badge"><i className={"dot d-" + rd.tone} />{rd.label}</span>
                         {(() => { const t = r.respond_by || r.pay_by; if (!t) return null; const h = (new Date(t).getTime() - Date.now()) / 3.6e6; if (h > 168) return null; const od = h < 0; return <span className={"badge " + (od ? "b-red" : h <= 72 ? "b-amber" : "b-grey")} style={{ marginLeft: "auto" }} title="Response / payment window"><i className={"dot d-" + (od ? "red" : h <= 72 ? "amber" : "grey")} />{untilLabel(t)}</span>; })()}
                       </div>
                       <div className="r2" style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
                         <span>{r.initiators?.name || "—"} · {money(r.demand_amount)} · {r.workflow_state}</span>
-                        {(() => { const idr = phaseOf(r) === "idr"; const lead = idr ? r.idr_registration_number : r.claim_number; return (
-                          <span className={"badge b-" + (idr ? "green" : "amber")} title={idr ? "Federal IDR" : "Open negotiation"}>
-                            <i className={"dot d-" + (idr ? "green" : "amber")} />{idr ? "IDR" : "Open neg."}{lead ? " · " + lead : ""}
-                          </span>
+                        {(() => { const idr = phaseOf(r) === "idr"; const ci = caseIdentity(r); return (
+                          <>
+                            <span className={"badge b-" + (idr ? "green" : "amber")} title={idr ? "Federal IDR" : "Open negotiation"}>
+                              <i className={"dot d-" + (idr ? "green" : "amber")} />{idr ? "IDR" : "Open neg."}
+                            </span>
+                            {ci.internal && ci.isLegal && <span className="muted" style={{ fontSize: 11 }}>internal #{ci.internal}</span>}
+                          </>
                         ); })()}
                         {briefMap[r.id] && (
                           <span className={"badge b-" + (DOC_STATUS_TONE[briefMap[r.id].status] || "grey")} title="Furthest-along brief status on this case">
@@ -825,12 +828,13 @@ function Detail({ dd, onRun, onDoc, onOpenNeg, onAction, onStageMoney, onView, o
   const verdict = s >= 80 ? ["Challenge — likely ineligible", "red"] : s >= 60 ? ["Review eligibility", "amber"] : ["Defensible", "green"];
   return (
     <div>
-      <div className="dh"><h1>#{d.external_ref}</h1>
-        {(() => { const idr = d.phase === "idr"; const lead = idr ? d.idr_registration_number : d.claim_number; return (
-          <span className={"badge b-" + (idr ? "green" : "amber")} style={{ marginLeft: 10 }} title="Case phase">
-            <i className={"dot d-" + (idr ? "green" : "amber")} />{idr ? "Federal IDR" : "Open negotiation"}{lead ? " · " + lead : ""}
-          </span>
-        ); })()}
+      <div className="dh">{(() => { const ci = caseIdentity(d); return (<>
+        <h1>{ci.label} {ci.number}</h1>
+        <span className={"badge b-" + (ci.phaseIdr ? "green" : "amber")} style={{ marginLeft: 10 }} title="Case phase">
+          <i className={"dot d-" + (ci.phaseIdr ? "green" : "amber")} />{ci.phaseIdr ? "Federal IDR" : "Open negotiation"}
+        </span>
+        {ci.internal && <span className="badge b-grey" style={{ marginLeft: 8 }} title="Operator internal case number">Internal #{ci.internal}</span>}
+      </>); })()}
         <span className="sub">{d.initiators?.name} · CPT {d.cpt_code} · {d.plans?.name} · {d.workflow_state}</span>
         {d.win_prob != null && (() => { const wp = Math.round(Number(d.win_prob) * 100); const tone = wp >= 60 ? "sage" : wp >= 40 ? "amber" : "red"; return <span className={"badge b-" + tone} style={{ marginLeft: 10 }} title="Modeled plan-prevail probability — open Explain for the full driver breakdown"><i className={"dot d-" + tone} />{wp}% win</span>; })()}
         {briefBest.s && <span className={"badge b-" + (DOC_STATUS_TONE[briefBest.s] || "grey")} style={{ marginLeft: 10 }} title="Furthest-along brief status on this case"><i className={"dot d-" + (DOC_STATUS_TONE[briefBest.s] || "grey")} />Brief: {DOC_STATUS_LABEL[briefBest.s] || "Draft"}</span>}

@@ -4,7 +4,7 @@
 import { useEffect, useState } from "react";
 import { supabase } from "../../lib/supabaseClient";
 
-const MODES = [["disputes", "Disputes · CSV"], ["edi", "Claims · EDI 837"], ["reference", "Org setup"], ["clearinghouse", "Clearinghouse"]];
+const MODES = [["notice", "Notice · AI scan"], ["disputes", "Disputes · CSV"], ["edi", "Claims · EDI 837"], ["reference", "Org setup"], ["clearinghouse", "Clearinghouse"]];
 const DISPUTE_COLS = ["external_ref", "initiator", "plan", "cpt_code", "service_date", "billed_amount", "demand_amount", "qpa_amount", "workflow_state", "carc", "rarc"];
 const SAMPLE = `external_ref,initiator,plan,cpt_code,service_date,billed_amount,demand_amount,qpa_amount,workflow_state
 IDR-30001,HaloMD,Acme Mfg PPO,70553,2026-05-12,7200,5880,1010,eligibility_review
@@ -29,9 +29,12 @@ function parseCSV(text) {
 }
 
 export function ImportHub({ orgId, onErr, onClose, onDone }) {
-  const [mode, setMode] = useState("disputes");
+  const [mode, setMode] = useState("notice");
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState(null);
+  // notice AI scan → case
+  const [nBusy, setNBusy] = useState(false);
+  const [nx, setNx] = useState(null);   // reviewed extraction payload
 
   // disputes CSV
   const [csv, setCsv] = useState("");
@@ -88,8 +91,52 @@ export function ImportHub({ orgId, onErr, onClose, onDone }) {
     return { kind: "clearinghouse", provider: data?.provider, status: data?.status };
   });
 
+  // ---- notice → AI scan → reviewed case ----
+  function scanNoticeFile(e) {
+    const f = e.target.files?.[0]; e.target.value = ""; if (!f) return;
+    const r = new FileReader();
+    r.onload = async () => {
+      const b64 = String(r.result || "").split(",")[1] || "";
+      setNBusy(true); setResult(null);
+      try {
+        const { data, error } = await supabase.functions.invoke("intake-notice", { body: { file_base64: b64, mime: f.type || "application/pdf" } });
+        if (error) throw error;
+        if (!data?.ok) { onErr(data?.reason || "Could not read the notice."); setNBusy(false); return; }
+        const ex = data.extracted || {};
+        setNx({
+          notice_type: ex.notice_type === "idr_initiation" ? "idr_initiation" : "open_negotiation",
+          internal_ref: "", claim_number: ex.claim_number || "", dispute_number: ex.dispute_number || "",
+          plan: ex.plan || "", initiator: ex.initiator || "", patient_ref: ex.patient_ref || "",
+          cpt_code: ex.cpt_code || "", service_category: ex.service_category || "",
+          service_date: ex.service_date || "", demand_amount: ex.demand_amount ?? "", qpa_amount: ex.qpa_amount ?? "",
+          billed_amount: ex.billed_amount ?? "", respond_by: ex.respond_by || "",
+          claims: Array.isArray(ex.claims) ? ex.claims.map((c) => ({ claim_number: c.claim_number || "", cpt: c.cpt || "", service_date: c.service_date || "", billed: c.billed ?? "", patient_ref: c.patient_ref || "" })) : [],
+          _name: f.name,
+        });
+      } catch (e2) { onErr(e2.message); }
+      setNBusy(false);
+    };
+    r.readAsDataURL(f);
+  }
+  const setN = (k, v) => setNx((p) => ({ ...p, [k]: v }));
+  const setNClaim = (i, k, v) => setNx((p) => ({ ...p, claims: p.claims.map((c, j) => j === i ? { ...c, [k]: v } : c) }));
+  const addNClaim = () => setNx((p) => ({ ...p, claims: [...(p.claims || []), { claim_number: "", cpt: "", service_date: "", billed: "", patient_ref: "" }] }));
+  const rmNClaim = (i) => setNx((p) => ({ ...p, claims: p.claims.filter((_, j) => j !== i) }));
+  async function createFromNotice() {
+    if (!nx) return;
+    setNBusy(true);
+    try {
+      const { data, error } = await supabase.rpc("create_case_from_notice", { p_payload: nx });
+      if (error) throw error;
+      if (!data?.ok) { onErr(data?.reason || "Could not create the case."); setNBusy(false); return; }
+      window.location.assign(`/dispute/${data.id}`);
+    } catch (e) { onErr(e.message); setNBusy(false); }
+  }
+
   const ta = { width: "100%", minHeight: 190, padding: "13px 15px", border: "0", borderRadius: 12, background: "var(--sunk)", boxShadow: "inset 0 0 0 1px var(--line)", font: "inherit", fontFamily: "var(--num)", fontSize: 12, lineHeight: 1.6, resize: "vertical" };
   const inp = { width: "100%", padding: "11px 13px", border: 0, borderRadius: 10, background: "var(--sunk)", boxShadow: "inset 0 0 0 1px var(--line)", font: "inherit", fontSize: 13 };
+  const grid = { display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(190px, 1fr))", gap: 10 };
+  const L = ({ t, children }) => <label style={{ display: "block" }}><span className="rlabel" style={{ fontSize: 11, display: "block", marginBottom: 3 }}>{t}</span>{children}</label>;
 
   return (
     <div className="modal-bg" onClick={onClose}>
@@ -103,6 +150,52 @@ export function ImportHub({ orgId, onErr, onClose, onDone }) {
           <div className="seg" style={{ marginBottom: 18 }}>
             {MODES.map(([k, l]) => <button key={k} className={mode === k ? "on" : ""} onClick={() => { setMode(k); setResult(null); }}>{l}</button>)}
           </div>
+
+          {mode === "notice" && (
+            <div>
+              <p className="muted" style={{ marginTop: 0 }}>Upload an <b>open-negotiation notice</b> or a <b>notice of IDR initiation</b> (PDF or image). Claude reads it, pulls the legal identifiers and claim line(s), and opens a case after your review. The legal number becomes the case&apos;s primary identifier.</p>
+              <label className="btn btn-a" style={{ cursor: "pointer", padding: "9px 15px", display: "inline-block" }}>
+                {nBusy ? "Reading notice…" : (nx ? "Scan a different notice" : "⤒ Upload notice")}
+                <input type="file" accept=".pdf,.png,.jpg,.jpeg,.webp" style={{ display: "none" }} disabled={nBusy} onChange={scanNoticeFile} />
+              </label>
+              {nx && (
+                <div className="panel" style={{ marginTop: 14 }}>
+                  <div className="ph" style={{ fontSize: 14 }}>Review — {nx._name}<span className="act"><span className="muted" style={{ fontSize: 11 }}>edit anything before creating</span></span></div>
+                  <div className="pb" style={{ paddingTop: 12 }}>
+                    <div style={grid}>
+                      <L t="Notice type"><select className="dsel" style={inp} value={nx.notice_type} onChange={(e) => setN("notice_type", e.target.value)}><option value="open_negotiation">Open negotiation</option><option value="idr_initiation">IDR initiation</option></select></L>
+                      {nx.notice_type === "idr_initiation"
+                        ? <L t="Dispute number (legal ID)"><input style={inp} value={nx.dispute_number} onChange={(e) => setN("dispute_number", e.target.value)} placeholder="Federal IDR dispute no." /></L>
+                        : <L t="Claim number (legal ID)"><input style={inp} value={nx.claim_number} onChange={(e) => setN("claim_number", e.target.value)} placeholder="claim / control no." /></L>}
+                      <L t="Internal case no. (optional)"><input style={inp} value={nx.internal_ref} onChange={(e) => setN("internal_ref", e.target.value)} placeholder="your own ref" /></L>
+                      <L t="Plan"><input style={inp} value={nx.plan} onChange={(e) => setN("plan", e.target.value)} /></L>
+                      <L t="Initiator"><input style={inp} value={nx.initiator} onChange={(e) => setN("initiator", e.target.value)} /></L>
+                      <L t="Patient ref (de-identified)"><input style={inp} value={nx.patient_ref} onChange={(e) => setN("patient_ref", e.target.value)} /></L>
+                      <L t="CPT"><input style={inp} value={nx.cpt_code} onChange={(e) => setN("cpt_code", e.target.value)} /></L>
+                      <L t="Service date"><input type="date" style={inp} value={nx.service_date || ""} onChange={(e) => setN("service_date", e.target.value)} /></L>
+                      <L t="Demand $"><input style={inp} value={nx.demand_amount} onChange={(e) => setN("demand_amount", e.target.value)} /></L>
+                      <L t="QPA $"><input style={inp} value={nx.qpa_amount} onChange={(e) => setN("qpa_amount", e.target.value)} /></L>
+                    </div>
+                    <div className="rlabel" style={{ marginTop: 14, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                      <span>Claims{nx.notice_type === "idr_initiation" ? " batched in this dispute" : ""}</span>
+                      <button className="mini" onClick={addNClaim}>+ Add claim</button>
+                    </div>
+                    {(nx.claims || []).length === 0 ? <p className="muted" style={{ fontSize: 12 }}>No separate claim lines — the case carries one lead claim from the fields above.</p> :
+                      nx.claims.map((c, i) => (
+                        <div key={i} style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center", margin: "6px 0" }}>
+                          <input style={{ ...inp, width: 150 }} placeholder="Claim #" value={c.claim_number} onChange={(e) => setNClaim(i, "claim_number", e.target.value)} />
+                          <input style={{ ...inp, width: 80 }} placeholder="CPT" value={c.cpt} onChange={(e) => setNClaim(i, "cpt", e.target.value)} />
+                          <input type="date" style={{ ...inp, width: 150 }} value={c.service_date || ""} onChange={(e) => setNClaim(i, "service_date", e.target.value)} />
+                          <input style={{ ...inp, width: 110 }} placeholder="Billed $" value={c.billed} onChange={(e) => setNClaim(i, "billed", e.target.value)} />
+                          <button className="mini" onClick={() => rmNClaim(i)}>✕</button>
+                        </div>
+                      ))}
+                    <button className="btn btn-a" style={{ marginTop: 14 }} disabled={nBusy} onClick={createFromNotice}>{nBusy ? "Creating…" : "Create case →"}</button>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
 
           {mode === "disputes" && (
             <div>
