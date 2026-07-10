@@ -912,29 +912,32 @@ function Detail({ dd, onRun, onDoc, onOpenNeg, onAction, onStageMoney, onView, o
           {(() => {
             const qpaAmt = Number(d.qpa_amount || 0);
             const fh = Number(qpa?.benchmark_fairhealth || 0);
-            const bench = fh > 0 ? { v: fh, label: "FAIR Health median" } : (qpa?.defensible_ceiling ? { v: Number(qpa.defensible_ceiling), label: "defensible ceiling" } : null);
+            const bench = fh > 0 ? { v: fh, short: "FAIR Health" } : (qpa?.defensible_ceiling ? { v: Number(qpa.defensible_ceiling), short: "ceiling" } : null);
             if (!offers || offers.length === 0) return <p className="muted">No offers yet. Open a negotiation to settle at ~125% of QPA before any IDR fee — the cheapest win.</p>;
             return (<>
-              {bench && <div className="muted" style={{ fontSize: 11.5, marginBottom: 8 }}>Each offer shown against the QPA and the {bench.label} ({money(bench.v)}).</div>}
+              {bench && <div className="muted" style={{ fontSize: 11.5, marginBottom: 6 }}>Benchmarked against QPA {money(qpaAmt)} · {bench.short} {money(bench.v)}.</div>}
               {offers.map((o) => {
-                const qp = o.pct_of_qpa != null ? Number(o.pct_of_qpa) : (qpaAmt > 0 ? Math.round(o.amount / qpaAmt * 1000) / 10 : null);
+                const qp = o.pct_of_qpa != null ? Math.round(Number(o.pct_of_qpa)) : (qpaAmt > 0 ? Math.round(o.amount / qpaAmt * 100) : null);
                 const bp = bench ? Math.round(o.amount / bench.v * 100) : null;
-                const overBench = bench ? o.amount > bench.v : false;
+                const over = bench ? o.amount > bench.v : false;
+                const isPlan = o.party === "plan";
                 return (
-                  <div key={o.id} className="frow" style={{ alignItems: "center", gap: 10 }}>
-                    <span className="mono muted" style={{ minWidth: 24, fontSize: 12 }}>#{o.round_no ?? "—"}</span>
-                    <span className={"badge b-" + (o.party === "plan" ? "ink" : "amber")} style={{ minWidth: 70, justifyContent: "center" }}>{o.party === "plan" ? "Plan" : "Provider"}</span>
-                    <div style={{ flex: 1 }}>
-                      <b className="mono">{money(o.amount)}</b>
-                      {qp != null && <span className="mono" style={{ marginLeft: 8, fontSize: 12, color: "var(--ink)" }}>{qp}% of QPA</span>}
-                      <div className="sub">{o.kind?.replace(/_/g, " ")}{o.note ? " · " + o.note : ""}</div>
+                  <div key={o.id} style={{ display: "flex", gap: 10, alignItems: "flex-start", padding: "10px 0", borderBottom: "1px solid var(--line)" }}>
+                    <span className="mono muted" style={{ fontSize: 11, width: 18, paddingTop: 4, flexShrink: 0 }}>{o.round_no ?? "—"}</span>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                        <span className={"badge b-" + (isPlan ? "ink" : "amber")}>{isPlan ? "Plan" : "Provider"}</span>
+                        <b className="mono" style={{ fontSize: 15 }}>{money(o.amount)}</b>
+                        {qp != null && <span className="mono muted" style={{ fontSize: 12 }}>{qp}% of QPA</span>}
+                        {o.status && <span className={"badge b-" + (OFFER_STATUS_TONE[o.status] || "grey")} style={{ marginLeft: "auto" }}>{OFFER_STATUS_LABEL[o.status] || o.status}</span>}
+                      </div>
+                      {bp != null && (
+                        <div style={{ fontSize: 12, marginTop: 4, display: "flex", alignItems: "center", gap: 6, color: over ? "var(--sig)" : "var(--ok)" }}>
+                          <i className={"dot d-" + (over ? "red" : "green")} />{bp}% of {bench.short} · {over ? "above benchmark" : "at / below benchmark"}
+                        </div>
+                      )}
+                      {o.note && <div className="muted" style={{ fontSize: 11.5, marginTop: 3 }}>{o.note}</div>}
                     </div>
-                    {bp != null && (
-                      <span className={"badge b-" + (overBench ? "red" : "green")} title={`${o.party === "plan" ? "Plan" : "Provider"} offer vs ${bench.label} (${money(bench.v)})`}>
-                        <i className={"dot d-" + (overBench ? "red" : "green")} />{bp}% of {fh > 0 ? "FAIR Health" : "ceiling"} · {overBench ? "above" : "at/below"}
-                      </span>
-                    )}
-                    {o.status && <span className={"badge b-" + (OFFER_STATUS_TONE[o.status] || "grey")}>{OFFER_STATUS_LABEL[o.status] || o.status}</span>}
                   </div>
                 );
               })}
