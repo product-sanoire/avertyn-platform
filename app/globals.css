@@ -452,9 +452,13 @@ input,select,textarea{color:var(--ink);font-family:inherit}
 .card{border-radius:15px}
 .feat{border-radius:16px}
 /* rows & buttons: calmer motion, hairline definition */
-.lrow{border-radius:10px}
+/* Case list: flush rows divided by thin hairlines rather than spaced cards. */
+.list{padding:6px 6px 6px 10px}
+.lrow{border-radius:8px;border:0;box-shadow:none;margin-bottom:0;padding:13px 14px;transition:background var(--dur)}
+.lrow + .lrow{border-top:1px solid var(--line-2)}      /* hairline between adjacent rows */
 .lrow:hover{box-shadow:none;background:var(--card)}
-.lrow.on{box-shadow:none;background:var(--card);border-color:var(--line-2)}
+.lrow.on{box-shadow:var(--sh-1);background:var(--card)}
+.lrow.on, .lrow.on + .lrow{border-top-color:transparent}  /* selected row reads as a card, no crossing hairline */
 .btn-s,.mini{box-shadow:inset 0 0 0 1px var(--line)}
 .btn-s:hover,.mini:hover{transform:none;background:var(--card-2);box-shadow:inset 0 0 0 1px var(--line-2)}
 .btn-a:hover{transform:none;box-shadow:var(--sh-2)}
