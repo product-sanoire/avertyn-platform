@@ -333,6 +333,18 @@ export default function Dashboard() {
     });
   })();
 
+  const briefCounts = (() => {
+    const c = { draft: 0, in_review: 0, approved: 0, filed: 0, sealed: 0, none: 0 };
+    for (const r of rows) {
+      const b = briefMap[r.id];
+      if (!b) { c.none++; continue; }
+      c[b.status] = (c[b.status] || 0) + 1;
+      if (b.sealed) c.sealed++;
+    }
+    return c;
+  })();
+  const pickBrief = (k) => { setBriefFilter(k); setTab(1); setStage("all"); };
+
   return (
     <div className="app">
       <div className="masthead">
@@ -371,7 +383,8 @@ export default function Dashboard() {
         <div style={{ flex: 1, overflow: "auto", padding: 22 }}>
           <CommandCenter metrics={metrics} score={score} awardsM={awardsM} agentM={agentM}
             scorecard={scorecard} gap={gap} onVerify={verifyLedger} onExport={exportData}
-            onAutopilot={runAutopilot} busy={busy} verify={verify} />
+            onAutopilot={runAutopilot} busy={busy} verify={verify}
+            briefCounts={briefCounts} onPickBrief={pickBrief} />
           <PredictionsView embedded onErr={setErr} onOpen={(id) => { setSel(id); setTab(1); setStage("all"); }} />
         </div>
       ) : tab === 2 ? (
@@ -598,7 +611,7 @@ function read(r) {
 
 function pct(n) { return n == null ? "—" : Math.round(Number(n)) + "%"; }
 
-function CommandCenter({ metrics, score, awardsM, agentM, scorecard, gap, onVerify, onExport, onAutopilot, busy, verify }) {
+function CommandCenter({ metrics, score, awardsM, agentM, scorecard, gap, onVerify, onExport, onAutopilot, busy, verify, briefCounts, onPickBrief }) {
   const overrideRate = agentM && (agentM.human_released + agentM.human_rejected)
     ? Math.round((agentM.human_rejected / (agentM.human_released + agentM.human_rejected)) * 100) : 0;
   const dlr = score?.default_loss_rate;
@@ -627,6 +640,23 @@ function CommandCenter({ metrics, score, awardsM, agentM, scorecard, gap, onVeri
         <Tile l="Agent actions" n={agentM?.agent_actions ?? "—"} />
         <Tile l="Human override" n={overrideRate + "%"} />
       </div>
+
+      {briefCounts && (
+        <div className="panel">
+          <div className="ph">Briefs by status<span className="act"><span className="muted" style={{ fontSize: 11 }}>furthest-along brief per case · click to filter the case list</span></span></div>
+          <div className="pb" style={{ display: "flex", gap: 10, flexWrap: "wrap", paddingTop: 12 }}>
+            {[["draft", "Draft", "grey"], ["in_review", "In review", "amber"], ["approved", "Approved", "green"], ["filed", "Filed", "ink"], ["sealed", "Sealed", "green"], ["none", "No brief yet", "grey"]].map(([k, label, tone]) => (
+              <div key={k} className="kpi-tile" role="button" tabIndex={0} style={{ cursor: "pointer", minWidth: 108 }}
+                onClick={() => onPickBrief && onPickBrief(k)}
+                onKeyDown={(e) => { if ((e.key === "Enter" || e.key === " ") && onPickBrief) { e.preventDefault(); onPickBrief(k); } }}
+                title={`Show ${label} cases`}>
+                <div className="l"><i className={"dot d-" + tone} style={{ marginRight: 6 }} />{label}</div>
+                <div className="n">{briefCounts[k] ?? 0}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       <div className="panel">
         <div className="ph">QPA gap by CPT<span className="act"><span className="muted" style={{ fontSize: 11 }}>demand ÷ QPA — where providers inflate most</span></span></div>
