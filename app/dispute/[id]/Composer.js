@@ -37,6 +37,11 @@ const KIND_LABEL = {
   ny_idr_position: "NY IDR position",
   tx_arbitration_position: "TX arbitration position",
   tx_mediation_position: "TX mediation position",
+  nj_arbitration_position: "NJ arbitration position",
+  ca_idrp_position: "CA IDRP position",
+  ct_payment_standard_defense: "CT payment-standard defense",
+  wa_arbitration_position: "WA arbitration position",
+  il_balance_bill_position: "IL balance-billing position",
   // QPA methodology & audit defense
   qpa_methodology_defense: "QPA methodology substantiation",
   qpa_audit_response: "QPA audit response",
@@ -51,6 +56,9 @@ const JURISDICTION_LABEL = {
   TX: "Texas",
   NJ: "New Jersey",
   CA: "California",
+  CT: "Connecticut",
+  WA: "Washington",
+  IL: "Illinois",
 };
 
 // Brief lifecycle: draft -> in review -> approved -> filed (separate from the tamper-evident seal).

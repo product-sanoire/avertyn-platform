@@ -431,6 +431,7 @@ export default function Dashboard() {
           <a className="btn btn-s" style={{ padding: "8px 14px", textDecoration: "none" }} href="/authorities">Register</a>
           <a className="btn btn-s" style={{ padding: "8px 14px", textDecoration: "none" }} href="/templates">Templates</a>
           <a className="btn btn-s" style={{ padding: "8px 14px", textDecoration: "none" }} href="/library">Library</a>
+          <a className="btn btn-s" style={{ padding: "8px 14px", textDecoration: "none" }} href="/programs">Programs</a>
           <button className="btn btn-s" style={{ padding: "8px 14px" }} onClick={() => setImportOpen(true)}>+ Import</button>
           <AccountMenu email={email} onSignOut={signOut} onExport={exportData} />
         </div>
