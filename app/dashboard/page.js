@@ -10,6 +10,7 @@ import { CommandPalette } from "./palette";
 import { FilingView } from "./filing";
 import { AdminView } from "./admin";
 import { ExplainModal } from "./explain";
+import Claims from "../dispute/[id]/Claims";
 
 const TABS = ["Overview", "Cases", "Intelligence", "Workspace", "Filing", "Admin"];
 const INTEL = [["initiators", "Initiators & IDREs"], ["exposure", "Employer exposure"]];
@@ -539,7 +540,7 @@ export default function Dashboard() {
                 })}
           </div>
           <div className="detail">
-            {!detail ? <p className="muted">Select a dispute…</p> : <Detail dd={detail} onRun={runEngine} onDoc={genLetter} onOpenNeg={openNeg} onAction={caseAction} onStageMoney={stageMoney} onView={setDocView} onExplain={() => setExplainId(sel)} busy={busy} />}
+            {!detail ? <p className="muted">Select a dispute…</p> : <Detail dd={detail} onRun={runEngine} onDoc={genLetter} onOpenNeg={openNeg} onAction={caseAction} onStageMoney={stageMoney} onView={setDocView} onExplain={() => setExplainId(sel)} onChanged={() => { loadDetail(sel); loadShell(); }} busy={busy} />}
           </div>
           <div className="rail">
             <div className="rlabel">Autopilot · governed</div>
@@ -814,7 +815,7 @@ td{padding:11px 10px;border-bottom:1px solid #efeade}td.n{text-align:right;font-
   );
 }
 
-function Detail({ dd, onRun, onDoc, onOpenNeg, onAction, onStageMoney, onView, onExplain, busy }) {
+function Detail({ dd, onRun, onDoc, onOpenNeg, onAction, onStageMoney, onView, onExplain, onChanged, busy }) {
   const { d, find, qpa, docs, offers } = dd;
   const briefBest = (docs || []).reduce((acc, x) => { const r = DOC_STATUS_RANK[x.status] || 1; return r >= acc.r ? { r, s: x.status || "draft" } : acc; }, { r: 0, s: null });
   const hasOnp = (offers || []).some((o) => o.kind === "open_negotiation");
@@ -847,6 +848,8 @@ function Detail({ dd, onRun, onDoc, onOpenNeg, onAction, onStageMoney, onView, o
         </div>
         <div className="box"><div className="l">Demand vs QPA</div><div className="n">{money(d.demand_amount)}</div><div className="l" style={{ marginTop: 3 }}>QPA {money(d.qpa_amount)}</div></div>
       </div>
+
+      <Claims disputeId={d.id} dispute={d} onIdentifiers={onChanged} />
 
       <div className="panel">
         <div className="ph">Eligibility findings
