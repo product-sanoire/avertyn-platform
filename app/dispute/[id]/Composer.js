@@ -84,6 +84,7 @@ export default function Composer({ dispute }) {
   const [editFile, setEditFile] = useState(null);   // inline metadata editor: {id, category, tags, party, doc_date}
   const [uploadCat, setUploadCat] = useState("evidence");
   const [redactFile, setRedactFile] = useState(null);
+  const [filePreview, setFilePreview] = useState(null);   // { ev, url } in-app file preview
   const loadEvidence = useCallback(async () => {
     if (!id) return;
     const { data } = await supabase.rpc("list_evidence", { p_dispute: id });
@@ -121,6 +122,15 @@ export default function Composer({ dispute }) {
       if (error) throw error;
       if (data?.signedUrl) window.open(data.signedUrl, "_blank");
     } catch (e) { setErr("Download failed: " + (e.message || e)); }
+  }
+  async function openPreview(ev) {
+    setBusy("preview:" + ev.id); setErr("");
+    try {
+      const { data, error } = await supabase.storage.from("evidence").createSignedUrl(ev.storage_path, 3600);
+      if (error) throw error;
+      if (data?.signedUrl) setFilePreview({ ev, url: data.signedUrl });
+    } catch (e) { setErr("Preview failed: " + (e.message || e)); }
+    setBusy("");
   }
   function beginEdit(ev) {
     setEditFile({ id: ev.id, category: ev.category || "evidence", tags: (ev.tags || []).join(", "), party: ev.party || "", doc_date: ev.doc_date || "" });
@@ -525,6 +535,7 @@ export default function Composer({ dispute }) {
                     </div>
                     <div style={{ display: "flex", gap: 6, alignItems: "center", flexShrink: 0 }}>
                       <span className={"badge b-" + tone}><i className={"dot d-" + tone} />{ev.status}</span>
+                      <button className="mini" disabled={busy === "preview:" + ev.id} onClick={() => openPreview(ev)}>{busy === "preview:" + ev.id ? "Opening…" : "Preview"}</button>
                       <button className="mini" onClick={() => downloadFile(ev)}>Download</button>
                       {/(pdf|image)/.test(ev.mime || "") && <button className="mini" onClick={() => setRedactFile(ev)} title="Redact PHI/PII (true burn-in)">Redact</button>}
                       <button className="mini" onClick={() => (editing ? setEditFile(null) : beginEdit(ev))}>{editing ? "Close" : "Edit"}</button>
@@ -552,6 +563,24 @@ export default function Composer({ dispute }) {
           <Redactor file={redactFile} disputeId={id} orgId={dispute?.org_id}
             onClose={() => setRedactFile(null)}
             onSaved={() => { setRedactFile(null); loadEvidence(); }} />
+        )}
+        {filePreview && (
+          <div style={previewOverlay} onClick={(e) => { if (e.target === e.currentTarget) setFilePreview(null); }}>
+            <div style={previewPanel}>
+              <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "12px 16px", borderBottom: "1px solid var(--line)" }}>
+                <b style={{ fontFamily: "var(--disp,serif)", fontSize: 15, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{filePreview.ev.filename}</b>
+                <span className="muted" style={{ fontSize: 12, flexShrink: 0 }}>{filePreview.ev.mime}</span>
+                <span style={{ flex: 1 }} />
+                <a className="mini" href={filePreview.url} target="_blank" rel="noreferrer" style={{ textDecoration: "none" }}>Open in new tab ↗</a>
+                <button className="mini" onClick={() => setFilePreview(null)}>Close</button>
+              </div>
+              {/(image)/.test(filePreview.ev.mime || "")
+                ? <div style={{ overflow: "auto", background: "var(--sunk,#f4f1ec)", textAlign: "center", padding: 16 }}>
+                    <img src={filePreview.url} alt={filePreview.ev.filename} style={{ maxWidth: "100%", height: "auto" }} />
+                  </div>
+                : <iframe src={filePreview.url} title={filePreview.ev.filename} style={{ border: 0, width: "100%", height: "78vh", background: "#fff" }} />}
+            </div>
+          </div>
         )}
       </div>
     );
@@ -778,5 +807,7 @@ const safeName = (s) => String(s || "document").replace(/[^a-z0-9]+/gi, "-").rep
 const rowBetween = { display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, flexWrap: "wrap" };
 const docRow = { display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, padding: "11px 0", borderBottom: "1px solid var(--line,#eee)" };
 const packetPanel = { border: "1px solid var(--line,#eee)", borderRadius: 12, padding: "14px 16px", margin: "12px 0 4px", background: "var(--card,#fff)" };
+const previewOverlay = { position: "fixed", inset: 0, background: "rgba(20,18,16,.55)", zIndex: 80, display: "flex", alignItems: "flex-start", justifyContent: "center", padding: "24px 16px", overflow: "auto" };
+const previewPanel = { background: "var(--card,#fff)", borderRadius: 14, width: "min(1000px,96vw)", maxHeight: "92vh", display: "flex", flexDirection: "column", overflow: "hidden", boxShadow: "0 12px 48px rgba(0,0,0,.3)" };
 const wizardGrid = { display: "grid", gridTemplateColumns: "minmax(0,1fr) minmax(0,1.1fr)", gap: 20, marginTop: 12, alignItems: "start" };
 const qLabel = { display: "block", fontWeight: 600, fontSize: 13, marginBottom: 2 };
