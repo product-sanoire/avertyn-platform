@@ -18,8 +18,11 @@ When in doubt, the live product = whatever is on `avertyn-platform` `main`.
 ## Deploy workflow
 
 Normal path: commit to `main`, push, Vercel auto-deploys (~1–2 min). Verify with
-`curl https://platform.avertyn.com/dashboard` and grep the served
-`/_next/static/chunks/app/dashboard/page-*.js` chunk for new strings.
+`curl https://platform.avertyn.com` and grep the served
+`/_next/static/chunks/app/page-*.js` chunk for new strings. The command center
+lives at the site root (`/`); its implementation is `app/dashboard/Dashboard.js`,
+re-exported by `app/page.js`. Sibling screens (`ops.js`, `workspace.js`, `admin.js`,
+etc.) still live under `app/dashboard/` as modules.
 
 **Known caveat — the git proxy:** the Cloud/Cowork sandbox routes all GitHub traffic
 through a proxy that only injects credentials for repos in *that session's* authorized

@@ -32,15 +32,15 @@ RLS hides every row unless your signed-in user is attached to that org.
    where u.email = 'YOU@EXAMPLE.COM'
    on conflict (id) do update set org_id = excluded.org_id;
    ```
-3. Reload `/dashboard` — the action queue and KPIs now render from live data.
+3. Reload the app root `/` — the action queue and KPIs now render from live data.
 
 > For local email testing you can enable "Confirm email = off" and use the Supabase
 > Auth "magic link" logs, or configure an SMTP provider in project Auth settings.
 
 ## What's implemented
-- `/` landing → `/dashboard`
+- `/` — the command center (session guard, redirects to `/login` when signed out)
 - `/login` — email OTP (magic link)
-- `/dashboard` — session guard, live `disputes` query (embeds plan + initiator names),
+- `/` command center — live `disputes` query (embeds plan + initiator names),
   KPI strip (open, likely-ineligible, windows < 48h, $ defended, awards), action queue
   with the "Avertyn read" recommendation per case (`lib/format.js`).
 

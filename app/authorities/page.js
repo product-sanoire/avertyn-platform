@@ -56,7 +56,7 @@ export default function AuthoritiesPage() {
       <div className="topbar"><span className="logo">A</span><b>Avertyn</b>
         <span style={{ color: "#d3cccd", fontSize: 13 }}>· Legal register</span></div>
       <div className="wrap" style={{ maxWidth: 1120, margin: "18px auto", padding: "0 22px" }}>
-        <Link href="/dashboard" className="muted">← Command center</Link>
+        <Link href="/" className="muted">← Command center</Link>
         <div className="dh" style={{ marginTop: 8, display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12, flexWrap: "wrap" }}>
           <div><h1>Legal register</h1>
             <span className="sub">The regulations and citations behind every brief — kept current by AI, verified against eCFR and the Federal Register. Documents cite these by reference, so an approved update flows into every new document automatically.</span></div>

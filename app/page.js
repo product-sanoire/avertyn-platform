@@ -1,16 +1,4 @@
-import Link from "next/link";
-
-export default function Home() {
-  return (
-    <div className="card">
-      <h1>Avertyn</h1>
-      <p>IDR defense for plans, TPAs & self-funded employers.</p>
-      <Link href="/dashboard">
-        <button className="btn">Open the command center →</button>
-      </Link>
-      <p className="muted" style={{ marginTop: 14 }}>
-        You&apos;ll be asked to sign in. See the README to attach your account to the demo org.
-      </p>
-    </div>
-  );
-}
+// Avertyn — the app home is the command center itself, served at the site root
+// (platform.avertyn.com). The dashboard guards its own session and redirects to
+// /login when signed out.
+export { default } from "./dashboard/Dashboard";

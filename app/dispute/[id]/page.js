@@ -71,7 +71,7 @@ export default function CaseWorkspace() {
   return (
     <Shell>
       <div className="wrap">
-        <Link href="/dashboard" className="muted">← Command center</Link>
+        <Link href="/" className="muted">← Command center</Link>
 
         <div style={{ display: "flex", alignItems: "baseline", gap: 12, marginTop: 10, flexWrap: "wrap" }}>
           {(() => { const ci = caseIdentity(d); return (

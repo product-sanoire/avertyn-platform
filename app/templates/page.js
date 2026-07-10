@@ -68,7 +68,7 @@ export default function TemplatesPage() {
       <div className="topbar"><span className="logo">A</span><b>Avertyn</b>
         <span style={{ color: "#d3cccd", fontSize: 13 }}>· Template builder</span></div>
       <div className="wrap" style={{ maxWidth: 1180, margin: "18px auto", padding: "0 22px" }}>
-        <Link href="/dashboard" className="muted">← Command center</Link>
+        <Link href="/" className="muted">← Command center</Link>
         <div className="dh" style={{ marginTop: 8 }}><h1>Document templates</h1>
           <span className="sub">Argument-document templates — clone a global template to customize it for your org, then edit clauses and questions with a live preview</span></div>
 
