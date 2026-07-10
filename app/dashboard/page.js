@@ -34,6 +34,20 @@ function downloadCSV(name, rows, cols) {
   const url = URL.createObjectURL(new Blob([csv], { type: "text/csv" }));
   const a = document.createElement("a"); a.href = url; a.download = name; a.click(); URL.revokeObjectURL(url);
 }
+// Brief lifecycle status badges (mirror the Composer / case page).
+const DOC_STATUS_LABEL = { draft: "Draft", in_review: "In review", approved: "Approved", filed: "Filed" };
+const DOC_STATUS_TONE = { draft: "grey", in_review: "amber", approved: "green", filed: "ink" };
+const DOC_STATUS_RANK = { draft: 1, in_review: 2, approved: 3, filed: 4 };
+function briefMapFrom(docs) {
+  const m = {};
+  for (const d of docs || []) {
+    const cur = m[d.dispute_id];
+    const rank = DOC_STATUS_RANK[d.status] || 1;
+    if (!cur || rank >= cur.rank) m[d.dispute_id] = { status: d.status || "draft", rank, sealed: (cur?.sealed || d.esign_status === "signed") };
+    else if (d.esign_status === "signed") cur.sealed = true;
+  }
+  return m;
+}
 const DISPUTE_CSV_COLS = [
   { h: "ref", f: (r) => r.external_ref }, { h: "initiator", f: (r) => r.initiators?.name }, { h: "plan", f: (r) => r.plans?.name },
   { h: "cpt", f: (r) => r.cpt_code }, { h: "demand", f: (r) => r.demand_amount }, { h: "qpa", f: (r) => r.qpa_amount },
@@ -46,6 +60,7 @@ export default function Dashboard() {
   const [userId, setUserId] = useState(null);
   const [orgId, setOrgId] = useState(null);
   const [rows, setRows] = useState([]);
+  const [briefMap, setBriefMap] = useState({});   // dispute_id -> { status, sealed } (furthest-along brief)
   const [sel, setSel] = useState(null);
   const [detail, setDetail] = useState(null);
   const [metrics, setMetrics] = useState(null);
@@ -103,11 +118,13 @@ export default function Dashboard() {
         supabase.from("action_log").select("action_type, actor, rationale, created_at").order("created_at", { ascending: false }).limit(8),
         supabase.from("autonomy_settings").select("action_type, mode, max_amount"),
         supabase.from("notifications").select("id, dispute_id, kind, title, body, severity, read, created_at").order("created_at", { ascending: false }).limit(30),
+        supabase.from("documents").select("dispute_id, status, esign_status"),
       ]);
       const firstErr = res.find((r) => r.error)?.error;
       if (firstErr) throw firstErr;
-      const [d, m, sc2, aw, am, sc, g, ex, q, f, au, nl] = res.map((r) => r.data);
+      const [d, m, sc2, aw, am, sc, g, ex, q, f, au, nl, db] = res.map((r) => r.data);
       setRows(d || []);
+      setBriefMap(briefMapFrom(db || []));
       setMetrics(m || null); setScore(sc2 || null); setAwardsM(aw || null); setAgentM(am || null);
       setScorecard(sc || []); setGap(g || []); setExposure(ex || []);
       setQueue(q || []); setFeed(f || []); setAutonomy(au || []);
@@ -144,7 +161,7 @@ export default function Dashboard() {
         supabase.from("disputes").select("*, plans(name), initiators(name)").eq("id", id).single(),
         supabase.from("eligibility_findings").select("result, detail, eligibility_rules(name, severity)").eq("dispute_id", id),
         supabase.from("qpa_records").select("*").eq("dispute_id", id).maybeSingle(),
-        supabase.from("documents").select("id, kind, title, esign_status, signed_by, signed_at, created_at, content").eq("dispute_id", id).order("created_at", { ascending: false }),
+        supabase.from("documents").select("id, kind, title, status, esign_status, signed_by, signed_at, created_at, content").eq("dispute_id", id).order("created_at", { ascending: false }),
         supabase.from("offers").select("id, party, kind, amount, note, submitted_at").eq("dispute_id", id).order("submitted_at", { ascending: true }),
       ]);
       setDetail({ d, find: find || [], qpa: q || null, docs: docs || [], offers: offs || [] });
@@ -191,7 +208,7 @@ export default function Dashboard() {
       .on("postgres_changes", { event: "*", schema: "public", table: "eligibility_findings" }, detail)
       .on("postgres_changes", { event: "*", schema: "public", table: "qpa_records" }, detail)
       .on("postgres_changes", { event: "*", schema: "public", table: "offers" }, detail)
-      .on("postgres_changes", { event: "*", schema: "public", table: "documents" }, detail)
+      .on("postgres_changes", { event: "*", schema: "public", table: "documents" }, () => { detail(); loadShell(); })
       .subscribe();
     return () => { supabase.removeChannel(ch); };
   }, [orgId, loadOps, loadShell, loadDetail]);
@@ -434,7 +451,16 @@ export default function Dashboard() {
                         <span className="badge"><i className={"dot d-" + rd.tone} />{rd.label}</span>
                         {(() => { const t = r.respond_by || r.pay_by; if (!t) return null; const h = (new Date(t).getTime() - Date.now()) / 3.6e6; if (h > 168) return null; const od = h < 0; return <span className={"badge " + (od ? "b-red" : h <= 72 ? "b-amber" : "b-grey")} style={{ marginLeft: "auto" }} title="Response / payment window"><i className={"dot d-" + (od ? "red" : h <= 72 ? "amber" : "grey")} />{untilLabel(t)}</span>; })()}
                       </div>
-                      <div className="r2">{r.initiators?.name || "—"} · {money(r.demand_amount)} · {r.workflow_state}</div>
+                      <div className="r2" style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                        <span>{r.initiators?.name || "—"} · {money(r.demand_amount)} · {r.workflow_state}</span>
+                        {briefMap[r.id] && (
+                          <span className={"badge b-" + (DOC_STATUS_TONE[briefMap[r.id].status] || "grey")} title="Furthest-along brief status on this case">
+                            <i className={"dot d-" + (DOC_STATUS_TONE[briefMap[r.id].status] || "grey")} />
+                            {DOC_STATUS_LABEL[briefMap[r.id].status] || "Draft"}
+                          </span>
+                        )}
+                        {briefMap[r.id]?.sealed && <span className="badge b-green" title="A document on this case is signed &amp; sealed"><i className="dot d-green" />Sealed</span>}
+                      </div>
                     </div>
                   );
                 })}
@@ -696,6 +722,7 @@ td{padding:11px 10px;border-bottom:1px solid #efeade}td.n{text-align:right;font-
 
 function Detail({ dd, onRun, onDoc, onOpenNeg, onAction, onStageMoney, onView, onExplain, busy }) {
   const { d, find, qpa, docs, offers } = dd;
+  const briefBest = (docs || []).reduce((acc, x) => { const r = DOC_STATUS_RANK[x.status] || 1; return r >= acc.r ? { r, s: x.status || "draft" } : acc; }, { r: 0, s: null });
   const hasOnp = (offers || []).some((o) => o.kind === "open_negotiation");
   const closed = d.workflow_state === "closed";
   const s = d.eligibility_score ?? 0;
@@ -706,6 +733,7 @@ function Detail({ dd, onRun, onDoc, onOpenNeg, onAction, onStageMoney, onView, o
       <div className="dh"><h1>#{d.external_ref}</h1>
         <span className="sub">{d.initiators?.name} · CPT {d.cpt_code} · {d.plans?.name} · {d.workflow_state}</span>
         {d.win_prob != null && (() => { const wp = Math.round(Number(d.win_prob) * 100); const tone = wp >= 60 ? "sage" : wp >= 40 ? "amber" : "red"; return <span className={"badge b-" + tone} style={{ marginLeft: 10 }} title="Modeled plan-prevail probability — open Explain for the full driver breakdown"><i className={"dot d-" + tone} />{wp}% win</span>; })()}
+        {briefBest.s && <span className={"badge b-" + (DOC_STATUS_TONE[briefBest.s] || "grey")} style={{ marginLeft: 10 }} title="Furthest-along brief status on this case"><i className={"dot d-" + (DOC_STATUS_TONE[briefBest.s] || "grey")} />Brief: {DOC_STATUS_LABEL[briefBest.s] || "Draft"}</span>}
         <span style={{ marginLeft: "auto", display: "flex", gap: 8 }}>
           <button className="mini" onClick={onExplain}>Explain ⓘ</button>
           <a className="mini" href={`/dispute/${d.id}`}>Open IDR case →</a>
@@ -774,6 +802,9 @@ function Detail({ dd, onRun, onDoc, onOpenNeg, onAction, onStageMoney, onView, o
                   {" · "}{new Date(doc.created_at).toLocaleDateString()}
                 </div>
               </div>
+              <span className={"badge b-" + (DOC_STATUS_TONE[doc.status] || "grey")} title="Brief status">
+                <i className={"dot d-" + (DOC_STATUS_TONE[doc.status] || "grey")} />{DOC_STATUS_LABEL[doc.status] || "Draft"}
+              </span>
               <button className="mini" onClick={() => onView(doc)}>View</button>
             </div>
           ))}

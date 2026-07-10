@@ -9,6 +9,17 @@ import Composer from "./Composer";
 
 const mark = { pass: ["ok", "✓"], fail: ["no", "×"], warn: ["warn", "!"], na: ["grey", "–"] };
 
+// Brief lifecycle status (mirrors the Composer): draft -> in review -> approved -> filed.
+const DOC_STATUS_LABEL = { draft: "Draft", in_review: "In review", approved: "Approved", filed: "Filed" };
+const DOC_STATUS_TONE = { draft: "grey", in_review: "amber", approved: "green", filed: "ink" };
+const DOC_STATUS_RANK = { draft: 1, in_review: 2, approved: 3, filed: 4 };
+const briefStatusOf = (docs) => {
+  if (!docs || !docs.length) return null;
+  let best = "draft", rank = 0;
+  for (const dc of docs) { const r = DOC_STATUS_RANK[dc.status] || 1; if (r >= rank) { rank = r; best = dc.status || "draft"; } }
+  return best;
+};
+
 export default function CaseWorkspace() {
   const router = useRouter();
   const { id } = useParams();
@@ -18,13 +29,14 @@ export default function CaseWorkspace() {
   const [qpa, setQpa] = useState(null);
   const [offers, setOffers] = useState([]);
   const [deadlines, setDeadlines] = useState([]);
+  const [briefDocs, setBriefDocs] = useState([]);
   const [busy, setBusy] = useState(false);
 
   const load = useCallback(async () => {
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) { router.push("/login"); return; }
 
-    const [{ data: disp }, { data: fnd }, { data: q }, { data: off }, { data: dl }] = await Promise.all([
+    const [{ data: disp }, { data: fnd }, { data: q }, { data: off }, { data: dl }, { data: docs }] = await Promise.all([
       supabase.from("disputes")
         .select("*, plans(name), employers(name), initiators(name)").eq("id", id).single(),
       supabase.from("eligibility_findings")
@@ -33,9 +45,10 @@ export default function CaseWorkspace() {
       supabase.from("qpa_records").select("*").eq("dispute_id", id).maybeSingle(),
       supabase.from("offers").select("*").eq("dispute_id", id).order("submitted_at"),
       supabase.from("deadlines").select("*").eq("dispute_id", id).order("due_at"),
+      supabase.from("documents").select("status, esign_status").eq("dispute_id", id),
     ]);
     setD(disp || null); setFindings(fnd || []); setQpa(q || null);
-    setOffers(off || []); setDeadlines(dl || []); setLoading(false);
+    setOffers(off || []); setDeadlines(dl || []); setBriefDocs(docs || []); setLoading(false);
   }, [id, router]);
 
   useEffect(() => { load(); }, [load]);
@@ -65,6 +78,16 @@ export default function CaseWorkspace() {
           <span className="muted">
             {d.initiators?.name} · CPT {d.cpt_code} · {d.plans?.name} · {d.service_category}
           </span>
+          {briefDocs.length > 0 && (
+            <span className={"badge b-" + (DOC_STATUS_TONE[briefStatusOf(briefDocs)] || "grey")}
+              title={`Furthest-along brief status across ${briefDocs.length} document${briefDocs.length === 1 ? "" : "s"} on this case`}>
+              <i className={"dot d-" + (DOC_STATUS_TONE[briefStatusOf(briefDocs)] || "grey")} />
+              Brief: {DOC_STATUS_LABEL[briefStatusOf(briefDocs)] || "Draft"}
+            </span>
+          )}
+          {briefDocs.some((x) => x.esign_status === "signed") && (
+            <span className="badge b-green"><i className="dot d-green" />Sealed</span>
+          )}
         </div>
 
         {/* Banner */}
