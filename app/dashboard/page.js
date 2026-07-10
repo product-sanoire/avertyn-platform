@@ -281,17 +281,29 @@ export default function Dashboard() {
   return (
     <div className="app">
       <div className="masthead">
-        <div className="brand"><span className="lg">A</span> Avertyn</div>
-        <div className="switch">Meridian Plan Administrators ⌄</div>
-        <div className="grow" />
-        <div className="search" title="Search & commands" style={{ cursor: "pointer" }} onClick={() => setPaletteOpen(true)}><span>Search…</span><span className="kbd">⌘K</span></div>
-        <button className="btn btn-s" style={{ padding: "7px 13px" }} onClick={() => setImportOpen(true)}>+ Import</button>
-        <span className="live" title="Realtime — updates as disputes, awards and alerts move"><span className="pulse" />Live</span>
-        <button className="bell" title="Notifications" onClick={() => setNotifOpen(true)}>
-          <span className="badge"><i className={"dot " + (notifs ? "d-red" : "d-green")} />{notifs} alerts</span>
-        </button>
-        <span className="who">{email}</span>
-        <button className="linkbtn" onClick={signOut}>Sign out</button>
+        <div className="mzone">
+          <span className="brandmark" role="img" aria-label="Avertyn">
+            <svg viewBox="0 0 512 512"><rect width="512" height="512" rx="112" fill="#141414" /><g fill="none" stroke="#F5F4F2" strokeWidth="44" strokeLinecap="butt" strokeLinejoin="round"><path d="M172 374 L244 196" /><path d="M340 374 L268 196" /></g><circle cx="256" cy="182" r="27" fill="#B23A2A" /></svg>
+          </span>
+          <button className="switch2" title="Meridian Plan Administrators">
+            <span className="col"><span className="eb">Workspace</span><span className="nm">Meridian Plan Administrators</span></span>
+            <span className="cv">⌄</span>
+          </button>
+        </div>
+        <div className="searchc">
+          <div className="search2" title="Search & commands" onClick={() => setPaletteOpen(true)}>
+            <svg className="mg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2"><circle cx="11" cy="11" r="7" /><path d="m21 21-4.3-4.3" /></svg>
+            <span>Search disputes, clients, files…</span><span className="kbd">⌘K</span>
+          </div>
+        </div>
+        <div className="mzone">
+          <span className="mchip live" title="Realtime — updates as disputes, awards and alerts move"><span className="pulse" />LIVE</span>
+          <button className={"mchip alert" + (notifs ? " loud" : "")} title="Notifications" onClick={() => setNotifOpen(true)}>
+            <i className={"dot " + (notifs ? "d-red" : "d-green")} />{notifs}
+          </button>
+          <button className="btn btn-s" style={{ padding: "8px 14px" }} onClick={() => setImportOpen(true)}>+ Import</button>
+          <AccountMenu email={email} onSignOut={signOut} onExport={exportData} />
+        </div>
       </div>
 
       <div className="tabs">
@@ -455,6 +467,29 @@ export default function Dashboard() {
       {docView && <DocModal doc={docView} onClose={() => setDocView(null)} />}
       {moneyRel && <MoneyReleaseModal q={moneyRel} onClose={() => setMoneyRel(null)} onRelease={(amt) => { releaseMoney(moneyRel.id, amt); setMoneyRel(null); }} />}
       {err && <div className="toast"><span className="td" />{err}<button onClick={() => { setErr(""); loadShell(); }}>Retry</button><button onClick={() => setErr("")}>Dismiss</button></div>}
+    </div>
+  );
+}
+
+function AccountMenu({ email, onSignOut, onExport }) {
+  const [open, setOpen] = useState(false);
+  const initials = ((email || "?").replace(/@.*/, "").replace(/[^a-zA-Z]/g, "").slice(0, 2) || "?").toUpperCase();
+  return (
+    <div className="acct">
+      <button className="acctbtn" title={email} aria-haspopup="menu" aria-expanded={open} onClick={() => setOpen((v) => !v)}>
+        <span className="acct-mono">{initials}</span><span className="cv">⌄</span>
+      </button>
+      {open && (
+        <>
+          <div className="acct-bg" onClick={() => setOpen(false)} />
+          <div className="acctmenu" role="menu">
+            <div className="id"><div className="nm">{email}</div></div>
+            <div className="mi" role="menuitem" onClick={() => { setOpen(false); onExport(); }}>Export org data</div>
+            <div className="sep" />
+            <div className="mi danger" role="menuitem" onClick={() => { setOpen(false); onSignOut(); }}>Sign out</div>
+          </div>
+        </>
+      )}
     </div>
   );
 }
@@ -801,33 +836,4 @@ function MoneyReleaseModal({ q, onRelease, onClose }) {
           </p>
           <div className="rlabel" style={{ margin: "10px 0 4px" }}>Re-type the amount</div>
           <input value={amt} onChange={(e) => setAmt(e.target.value)} inputMode="decimal" placeholder={String(q.amount)}
-            style={{ width: "100%", padding: "11px 13px", border: "1px solid var(--line)", borderRadius: 10, font: "inherit", fontSize: 13 }} />
-          <label style={{ display: "flex", gap: 8, alignItems: "flex-start", marginTop: 12, fontSize: 12.5, color: "var(--mut)" }}>
-            <input type="checkbox" checked={ack} onChange={(e) => setAck(e.target.checked)} style={{ marginTop: 2 }} />
-            I have re-authenticated (step-up) and approve this payment as a second reviewer.
-          </label>
-          <button className="btn btn-a" style={{ marginTop: 16, width: "100%" }} disabled={!ok} onClick={() => onRelease(Number(amt))}>
-            Release {money(q.amount)}
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function DocModal({ doc, onClose }) {
-  return (
-    <div className="modal-bg" onClick={onClose}>
-      <div className="modal" onClick={(e) => e.stopPropagation()}>
-        <div className="mhd">
-          <b>{doc.title || doc.kind?.replace(/_/g, " ")}</b>
-          {doc.esign_status === "signed" && <span className="badge b-green"><i className="dot d-green" />Signed{doc.signed_by ? " · " + doc.signed_by : ""}</span>}
-          <button className="x" onClick={onClose}>×</button>
-        </div>
-        <div className="mbody">
-          {doc.content ? <pre>{doc.content}</pre> : <p className="muted">This document has no inline content (stored as a file).</p>}
-        </div>
-      </div>
-    </div>
-  );
-}
+            s
