@@ -50,6 +50,12 @@ const PACKET_EXTRAS = [
   "state_redirection",
 ];
 
+// Case-file cabinet: category taxonomy for uploaded documents.
+const FILE_CATS = ["filing", "evidence", "correspondence", "contract", "medical", "other"];
+const CAT_LABEL = { filing: "Filing", evidence: "Evidence", correspondence: "Correspondence", contract: "Contract", medical: "Medical", other: "Other" };
+const CAT_TONE = { filing: "green", evidence: "grey", correspondence: "amber", contract: "ink", medical: "red", other: "grey" };
+const fmtBytes = (n) => { n = Number(n || 0); return n < 1024 ? n + " B" : n < 1048576 ? (n / 1024).toFixed(0) + " KB" : (n / 1048576).toFixed(1) + " MB"; };
+
 export default function Composer({ dispute }) {
   const id = dispute?.id;
   const [docs, setDocs] = useState([]);
@@ -71,6 +77,11 @@ export default function Composer({ dispute }) {
   // ---- evidence ----
   const [evidence, setEvidence] = useState([]);
   const [evBusy, setEvBusy] = useState(false);
+  const [fileCat, setFileCat] = useState("all");
+  const [fileQuery, setFileQuery] = useState("");
+  const [fileSort, setFileSort] = useState("date");
+  const [editFile, setEditFile] = useState(null);   // inline metadata editor: {id, category, tags, party, doc_date}
+  const [uploadCat, setUploadCat] = useState("evidence");
   const loadEvidence = useCallback(async () => {
     if (!id) return;
     const { data } = await supabase.rpc("list_evidence", { p_dispute: id });
@@ -90,6 +101,10 @@ export default function Composer({ dispute }) {
       const { data: evId, error: ae } = await supabase.rpc("add_evidence", {
         p_dispute: id, p_path: path, p_filename: file.name, p_mime: file.type || "application/octet-stream", p_size: file.size });
       if (ae) throw ae;
+      // tag it with the chosen category on the way in
+      if (uploadCat && uploadCat !== "evidence") {
+        await supabase.rpc("set_file_meta", { p_id: evId, p_category: uploadCat }).catch(() => {});
+      }
       await loadEvidence();
       // fire-and-refresh: AI scan
       supabase.functions.invoke("scan-evidence", { body: { evidence_id: evId } })
@@ -97,6 +112,25 @@ export default function Composer({ dispute }) {
         .catch(() => loadEvidence());
     } catch (e) { setErr("Upload failed: " + (e.message || e)); }
     setEvBusy(false);
+  }
+  async function downloadFile(ev) {
+    try {
+      const { data, error } = await supabase.storage.from("evidence").createSignedUrl(ev.storage_path, 3600);
+      if (error) throw error;
+      if (data?.signedUrl) window.open(data.signedUrl, "_blank");
+    } catch (e) { setErr("Download failed: " + (e.message || e)); }
+  }
+  function beginEdit(ev) {
+    setEditFile({ id: ev.id, category: ev.category || "evidence", tags: (ev.tags || []).join(", "), party: ev.party || "", doc_date: ev.doc_date || "" });
+  }
+  async function saveMeta() {
+    if (!editFile) return;
+    const tags = editFile.tags.split(",").map((t) => t.trim()).filter(Boolean);
+    const { data, error } = await supabase.rpc("set_file_meta", {
+      p_id: editFile.id, p_category: editFile.category, p_tags: tags,
+      p_party: editFile.party || null, p_doc_date: editFile.doc_date || null });
+    if (error || data?.ok === false) { setErr(error?.message || data?.reason || "Could not save file details."); return; }
+    setEditFile(null); loadEvidence();
   }
   async function rescan(evId) {
     setEvBusy(true);
@@ -316,6 +350,23 @@ export default function Composer({ dispute }) {
 
   // ---------- LIST ----------
   if (view === "list") {
+    const files = (() => {
+      let arr = evidence;
+      if (fileCat !== "all") arr = arr.filter((e) => (e.category || "evidence") === fileCat);
+      const fq = fileQuery.trim().toLowerCase();
+      if (fq) arr = arr.filter((e) =>
+        (e.filename || "").toLowerCase().includes(fq) ||
+        (e.summary?.one_liner || "").toLowerCase().includes(fq) ||
+        (e.party || "").toLowerCase().includes(fq) ||
+        (e.tags || []).some((t) => String(t).toLowerCase().includes(fq)));
+      return [...arr].sort((a, b) => {
+        if (fileSort === "name") return (a.filename || "").localeCompare(b.filename || "");
+        if (fileSort === "category") return (a.category || "").localeCompare(b.category || "") || (a.filename || "").localeCompare(b.filename || "");
+        if (fileSort === "party") return (a.party || "~").localeCompare(b.party || "~");
+        return new Date(b.doc_date || b.created_at) - new Date(a.doc_date || a.created_at);
+      });
+    })();
+    const catCounts = evidence.reduce((m, e) => { const c = e.category || "evidence"; m[c] = (m[c] || 0) + 1; return m; }, {});
     return (
       <div>
         {err && <Err msg={err} onClose={() => setErr("")} />}
@@ -387,53 +438,94 @@ export default function Composer({ dispute }) {
           </div>
         )}
 
-        {/* Evidence — upload existing case documents; AI scans them into the argument */}
-        <div className="rlabel" style={{ marginTop: 20, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-          <span>Evidence &amp; exhibits</span>
-          <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+        {/* Case files — the per-case cabinet: uploaded documents, categorized, tagged, searchable */}
+        <div className="rlabel" style={{ marginTop: 22, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <span>Case files</span>
+          <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+            <a className="mini" href="/library" target="_blank" rel="noreferrer" style={{ textDecoration: "none" }}>Search all cases ↗</a>
             {evidence.some((ev) => ev.status === "scanned") && (
               <button className="mini" disabled={busy === "exhibits"} onClick={downloadExhibits}
                 title="Merge every scanned document into one page-numbered exhibit bundle">
                 {busy === "exhibits" ? "Building…" : "⤓ Exhibits PDF"}
               </button>
             )}
-            <label className="mini" style={{ cursor: "pointer" }}>
-              {evBusy ? "Uploading…" : "+ Upload document"}
+            <select className="dsel" value={uploadCat} onChange={(e) => setUploadCat(e.target.value)} style={{ padding: "6px 8px", fontSize: 12 }} title="Category for the next upload">
+              {FILE_CATS.map((c) => <option key={c} value={c}>{CAT_LABEL[c]}</option>)}
+            </select>
+            <label className="btn btn-s" style={{ cursor: "pointer", padding: "7px 12px" }}>
+              {evBusy ? "Uploading…" : "+ Upload"}
               <input type="file" accept=".pdf,.png,.jpg,.jpeg,.webp,.txt" style={{ display: "none" }}
                 disabled={evBusy} onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ""; uploadEvidence(f); }} />
             </label>
           </div>
         </div>
+
         {evidence.length === 0 ? (
-          <p className="muted" style={{ fontSize: 12 }}>Upload the open-negotiation notice, EOB/remittance, the initiator's filing, or contracts. Claude scans each and, once scanned, it's cited as an exhibit and folded into the AI-drafted argument.</p>
+          <p className="muted" style={{ fontSize: 12 }}>No files yet. Upload the open-negotiation notice, EOB/remittance, the initiator&apos;s filing, contracts, or medical records. Pick a category on upload; Claude scans each so it&apos;s searchable and can be cited as an exhibit.</p>
         ) : (
-          <div>
-            {evidence.map((ev) => {
+          <>
+            <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", margin: "10px 0 6px" }}>
+              <div className="seg" style={{ flexWrap: "wrap" }}>
+                <button className={fileCat === "all" ? "on" : ""} onClick={() => setFileCat("all")}>All ({evidence.length})</button>
+                {FILE_CATS.filter((c) => catCounts[c]).map((c) => (
+                  <button key={c} className={fileCat === c ? "on" : ""} onClick={() => setFileCat(c)}>{CAT_LABEL[c]} ({catCounts[c]})</button>
+                ))}
+              </div>
+              <span style={{ flex: 1 }} />
+              <input className="dsel" placeholder="Search files…" value={fileQuery} onChange={(e) => setFileQuery(e.target.value)}
+                style={{ padding: "7px 10px", fontSize: 12.5, minWidth: 150 }} />
+              <select className="dsel" value={fileSort} onChange={(e) => setFileSort(e.target.value)} style={{ padding: "7px 9px", fontSize: 12 }}>
+                <option value="date">Sort: date</option>
+                <option value="name">Sort: name</option>
+                <option value="category">Sort: category</option>
+                <option value="party">Sort: party</option>
+              </select>
+            </div>
+
+            {files.length === 0 ? (
+              <p className="muted" style={{ fontSize: 12, padding: "8px 0" }}>No files match.</p>
+            ) : files.map((ev) => {
               const tone = ev.status === "scanned" ? "green" : ev.status === "error" ? "red" : "amber";
+              const scanTxt = ev.status === "scanned" && ev.summary?.one_liner ? ev.summary.one_liner
+                : ev.status === "error" ? ("Scan failed: " + (ev.error || "unknown"))
+                : ev.status === "scanning" ? "Scanning…" : "Uploaded — not scanned";
+              const editing = editFile && editFile.id === ev.id;
               return (
-                <div key={ev.id} style={docRow}>
-                  <div style={{ minWidth: 0 }}>
-                    <b>{ev.filename}</b>
-                    <span className="muted" style={{ display: "block", fontSize: 12 }}>
-                      {ev.status === "scanned" && ev.summary?.one_liner ? ev.summary.one_liner
-                        : ev.status === "error" ? ("Scan failed: " + (ev.error || "unknown"))
-                        : ev.status === "scanning" ? "Scanning…" : "Uploaded — not scanned"}
-                    </span>
-                    {ev.status === "scanned" && Array.isArray(ev.summary?.relevance) && ev.summary.relevance.length > 0 && (
+                <div key={ev.id} style={{ ...docRow, alignItems: "flex-start", flexDirection: "column", gap: 6 }}>
+                  <div style={{ display: "flex", width: "100%", gap: 10, alignItems: "flex-start" }}>
+                    <div style={{ minWidth: 0, flex: 1 }}>
+                      <b>{ev.filename}</b>
+                      <span className={"badge b-" + (CAT_TONE[ev.category] || "grey")} style={{ marginLeft: 8 }}>{CAT_LABEL[ev.category] || "Evidence"}</span>
+                      {(ev.tags || []).map((t) => <span key={t} className="badge b-grey" style={{ marginLeft: 6 }}>#{t}</span>)}
+                      <span className="muted" style={{ display: "block", fontSize: 12, marginTop: 2 }}>{scanTxt}</span>
                       <span className="muted" style={{ fontSize: 11 }}>
-                        Supports: {ev.summary.relevance.map((r) => r.code).join(", ")}
+                        {[ev.party, ev.doc_date ? new Date(ev.doc_date).toLocaleDateString() : null, fmtBytes(ev.byte_size)].filter(Boolean).join(" · ")}
+                        {ev.status === "scanned" && Array.isArray(ev.summary?.relevance) && ev.summary.relevance.length > 0 && (" · Supports: " + ev.summary.relevance.map((r) => r.code).join(", "))}
                       </span>
-                    )}
+                    </div>
+                    <div style={{ display: "flex", gap: 6, alignItems: "center", flexShrink: 0 }}>
+                      <span className={"badge b-" + tone}><i className={"dot d-" + tone} />{ev.status}</span>
+                      <button className="mini" onClick={() => downloadFile(ev)}>Download</button>
+                      <button className="mini" onClick={() => (editing ? setEditFile(null) : beginEdit(ev))}>{editing ? "Close" : "Edit"}</button>
+                      {ev.status !== "scanning" && <button className="mini" disabled={evBusy} onClick={() => rescan(ev.id)} title="Re-run AI scan">Scan</button>}
+                      <button className="mini" onClick={() => removeEvidence(ev.id)} title="Delete file">✕</button>
+                    </div>
                   </div>
-                  <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-                    <span className={"badge b-" + tone}><i className={"dot d-" + tone} />{ev.status}</span>
-                    {ev.status !== "scanning" && <button className="mini" disabled={evBusy} onClick={() => rescan(ev.id)}>Scan</button>}
-                    <button className="mini" onClick={() => removeEvidence(ev.id)}>✕</button>
-                  </div>
+                  {editing && (
+                    <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", width: "100%", padding: "4px 0 2px" }}>
+                      <select className="dsel" value={editFile.category} onChange={(e) => setEditFile({ ...editFile, category: e.target.value })} style={{ padding: "6px 8px", fontSize: 12 }}>
+                        {FILE_CATS.map((c) => <option key={c} value={c}>{CAT_LABEL[c]}</option>)}
+                      </select>
+                      <input className="dsel" placeholder="tags, comma-separated" value={editFile.tags} onChange={(e) => setEditFile({ ...editFile, tags: e.target.value })} style={{ padding: "6px 8px", fontSize: 12, minWidth: 160 }} />
+                      <input className="dsel" placeholder="party" value={editFile.party} onChange={(e) => setEditFile({ ...editFile, party: e.target.value })} style={{ padding: "6px 8px", fontSize: 12, width: 120 }} />
+                      <input className="dsel" type="date" value={editFile.doc_date || ""} onChange={(e) => setEditFile({ ...editFile, doc_date: e.target.value })} style={{ padding: "6px 8px", fontSize: 12 }} />
+                      <button className="btn btn-a" style={{ padding: "6px 12px" }} onClick={saveMeta}>Save</button>
+                    </div>
+                  )}
                 </div>
               );
             })}
-          </div>
+          </>
         )}
       </div>
     );
