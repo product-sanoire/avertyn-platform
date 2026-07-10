@@ -33,6 +33,24 @@ const KIND_LABEL = {
   settlement_closure_notice: "Settlement closure notice",
   general_letter: "General letter",
   case_packet: "Filing packet",
+  // State surprise-billing jurisdictions
+  ny_idr_position: "NY IDR position",
+  tx_arbitration_position: "TX arbitration position",
+  tx_mediation_position: "TX mediation position",
+  // QPA methodology & audit defense
+  qpa_methodology_defense: "QPA methodology substantiation",
+  qpa_audit_response: "QPA audit response",
+  // Air-ambulance IDR
+  air_ambulance_position: "Air-ambulance IDR position",
+};
+
+// Jurisdiction grouping labels for the template picker (falls back to the raw code).
+const JURISDICTION_LABEL = {
+  federal: "Federal (NSA IDR)",
+  NY: "New York",
+  TX: "Texas",
+  NJ: "New Jersey",
+  CA: "California",
 };
 
 // Brief lifecycle: draft -> in review -> approved -> filed (separate from the tamper-evident seal).
@@ -593,7 +611,17 @@ export default function Composer({ dispute }) {
         {err && <Err msg={err} onClose={() => setErr("")} />}
         <div style={rowBetween}>
           <select className="dsel" value={tpl.code} onChange={(e) => pickTemplate(e.target.value)} style={{ padding: "8px 10px" }}>
-            {templates.map((t) => <option key={t.code} value={t.code}>{t.title}</option>)}
+            {Object.entries(
+              (templates || []).reduce((groups, t) => {
+                const jur = t.jurisdiction || "federal";
+                (groups[jur] = groups[jur] || []).push(t);
+                return groups;
+              }, {})
+            ).map(([jur, ts]) => (
+              <optgroup key={jur} label={JURISDICTION_LABEL[jur] || jur.toUpperCase()}>
+                {ts.map((t) => <option key={t.code} value={t.code}>{KIND_LABEL[t.kind] || t.title}</option>)}
+              </optgroup>
+            ))}
           </select>
           <div style={{ display: "flex", gap: 8 }}>
             <a className="mini" href="/templates" target="_blank" rel="noreferrer" style={{ textDecoration: "none" }}>Manage templates ↗</a>
