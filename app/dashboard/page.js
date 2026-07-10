@@ -6,7 +6,8 @@ import { money } from "../../lib/format";
 import { InboxView, TasksView, CalendarView, PredictionsView } from "./ops";
 import { InitiatorsView, DeadlinesView, IntegrationsView } from "./tiera";
 
-const TABS = ["Command center", "Incoming", "Eligibility", "QPA defense", "Respond & pay", "Employer exposure", "Inbox", "Tasks", "Calendar", "Predictions", "Initiators", "Deadlines", "Integrations"];
+const TABS = ["Overview", "Disputes", "Deadlines", "Initiators", "Exposure", "Predictions", "Inbox", "Tasks", "Calendar", "Integrations"];
+const STAGES = [["all", "All"], ["incoming", "Incoming"], ["eligibility", "Eligibility"], ["qpa", "QPA defense"], ["respond", "Respond & pay"]];
 const mkg = { pass: ["pass", "✓"], fail: ["fail", "×"], warn: ["warn", "!"], na: ["na", "–"] };
 
 // Friendly labels for autonomy action codes.
@@ -43,6 +44,7 @@ export default function Dashboard() {
   const [docView, setDocView] = useState(null);
   const [moneyRel, setMoneyRel] = useState(null);
   const [tab, setTab] = useState(0);
+  const [stage, setStage] = useState("all");
   const [busy, setBusy] = useState("");
   const [verify, setVerify] = useState(null);
   const [err, setErr] = useState("");
@@ -198,12 +200,14 @@ export default function Dashboard() {
 
   // ---- tab filters ---------------------------------------------------------
   const filtered = (() => {
-    if (tab === 2) return rows.filter((r) => (r.eligibility_score || 0) >= 60 || ["intake", "triage", "eligibility_review"].includes(r.workflow_state));
-    if (tab === 3) return rows.filter((r) => r.workflow_state === "qpa_defense" || r.workflow_state === "response_prep");
-    if (tab === 4) return rows.filter((r) => ["response_prep", "awaiting_determination", "award_payment"].includes(r.workflow_state) || r.disposition === "provider_win");
+    if (tab !== 1 || stage === "all") return rows;
+    if (stage === "incoming") return rows.filter((r) => ["intake", "triage"].includes(r.workflow_state));
+    if (stage === "eligibility") return rows.filter((r) => (r.eligibility_score || 0) >= 60 || ["intake", "triage", "eligibility_review"].includes(r.workflow_state));
+    if (stage === "qpa") return rows.filter((r) => r.workflow_state === "qpa_defense" || r.workflow_state === "response_prep");
+    if (stage === "respond") return rows.filter((r) => ["response_prep", "awaiting_determination", "award_payment"].includes(r.workflow_state) || r.disposition === "provider_win");
     return rows;
   })();
-  const tabHeader = ["", "Incoming", "Eligibility review", "QPA defense", "Respond & pay"][tab] || "";
+  const tabHeader = STAGES.find((s) => s[0] === stage)?.[1] || "All";
 
   return (
     <div className="app">
@@ -229,9 +233,21 @@ export default function Dashboard() {
             scorecard={scorecard} gap={gap} onVerify={verifyLedger} onExport={exportData}
             onAutopilot={runAutopilot} busy={busy} verify={verify} />
         </div>
-      ) : tab === 5 ? (
+      ) : tab === 2 ? (
+        <div style={{ flex: 1, overflow: "auto", padding: 22 }}>
+          <DeadlinesView orgId={orgId} onErr={setErr} />
+        </div>
+      ) : tab === 3 ? (
+        <div style={{ flex: 1, overflow: "auto", padding: 22 }}>
+          <InitiatorsView orgId={orgId} onErr={setErr} />
+        </div>
+      ) : tab === 4 ? (
         <div style={{ flex: 1, overflow: "auto", padding: 22 }}>
           <ExposureView exposure={exposure} />
+        </div>
+      ) : tab === 5 ? (
+        <div style={{ flex: 1, overflow: "auto", padding: 22 }}>
+          <PredictionsView onErr={setErr} onOpen={(id) => { setSel(id); setTab(1); setStage("all"); }} />
         </div>
       ) : tab === 6 ? (
         <div style={{ flex: 1, overflow: "hidden" }}>
@@ -247,24 +263,22 @@ export default function Dashboard() {
         </div>
       ) : tab === 9 ? (
         <div style={{ flex: 1, overflow: "auto", padding: 22 }}>
-          <PredictionsView onErr={setErr} onOpen={(id) => { setSel(id); setTab(1); }} />
-        </div>
-      ) : tab === 10 ? (
-        <div style={{ flex: 1, overflow: "auto", padding: 22 }}>
-          <InitiatorsView orgId={orgId} onErr={setErr} />
-        </div>
-      ) : tab === 11 ? (
-        <div style={{ flex: 1, overflow: "auto", padding: 22 }}>
-          <DeadlinesView orgId={orgId} onErr={setErr} />
-        </div>
-      ) : tab === 12 ? (
-        <div style={{ flex: 1, overflow: "auto", padding: 22 }}>
           <IntegrationsView onErr={setErr} />
         </div>
       ) : (
-        <div className="work">
+        <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}>
+          <div style={{ padding: "16px 24px 12px", display: "flex", alignItems: "center", gap: 13, flexWrap: "wrap" }}>
+            <h1 style={{ fontFamily: "var(--disp)", fontSize: 25, margin: 0, letterSpacing: "-.02em" }}>Disputes</h1>
+            <div className="seg">
+              {STAGES.map(([k, label]) => (
+                <button key={k} className={stage === k ? "on" : ""} onClick={() => setStage(k)}>{label}</button>
+              ))}
+            </div>
+            <span className="muted" style={{ marginLeft: "auto", fontSize: 12.5 }}>{filtered.length} in view</span>
+          </div>
+          <div className="work" style={{ flex: 1 }}>
           <div className="list">
-            <div className="lhdr"><b>{tabHeader}</b><span className="ct">{filtered.length} disputes</span></div>
+            <div className="lhdr"><b>{tabHeader}</b><span className="ct">{filtered.length}</span></div>
             {filtered.length === 0
               ? <p className="muted" style={{ padding: 16 }}>Nothing in this stage right now.</p>
               : filtered.map((r) => {
@@ -329,6 +343,7 @@ export default function Dashboard() {
             </div></div>
           </div>
         </div>
+        </div>
       )}
 
       {notifOpen && <NotifDrawer list={notifList} onClose={() => setNotifOpen(false)} onOpen={openNotif} onAllRead={markAllRead} />}
@@ -358,7 +373,7 @@ function CommandCenter({ metrics, score, awardsM, agentM, scorecard, gap, onVeri
   const settled = score?.avg_settled_pct_of_demand;
   return (
     <div>
-      <div className="dh"><h1>Command center</h1><span className="sub">Meridian Plan Administrators · all plans</span></div>
+      <div className="dh"><h1>Overview</h1><span className="sub">Meridian Plan Administrators · all plans</span></div>
 
       <div className="cards" style={{ marginTop: 14 }}>
         <Tile l="Open disputes" n={score?.open_disputes ?? metrics?.open_disputes ?? "—"} />
@@ -434,7 +449,7 @@ function ExposureView({ exposure }) {
   const totalDef = exposure.reduce((a, e) => a + Number(e.defended || 0), 0);
   return (
     <div>
-      <div className="dh"><h1>Employer exposure</h1><span className="sub">What IDR is costing each plan sponsor — the view your brokers distribute</span></div>
+      <div className="dh"><h1>Exposure</h1><span className="sub">What IDR is costing each plan sponsor — the view your brokers distribute</span></div>
       <div className="cards" style={{ marginTop: 14 }}>
         <Tile l="Employers" n={exposure.length} />
         <Tile l="Total at risk (open)" n={money(totalRisk)} />
