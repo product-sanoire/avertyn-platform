@@ -303,7 +303,7 @@ export default function Dashboard() {
           <CommandCenter metrics={metrics} score={score} awardsM={awardsM} agentM={agentM}
             scorecard={scorecard} gap={gap} onVerify={verifyLedger} onExport={exportData}
             onAutopilot={runAutopilot} busy={busy} verify={verify} />
-          <PredictionsView onErr={setErr} onOpen={(id) => { setSel(id); setTab(1); setStage("all"); }} />
+          <PredictionsView embedded onErr={setErr} onOpen={(id) => { setSel(id); setTab(1); setStage("all"); }} />
         </div>
       ) : tab === 2 ? (
         <div style={{ flex: 1, overflow: "auto", padding: "20px 26px" }}>
@@ -629,6 +629,7 @@ function Detail({ dd, onRun, onDoc, onOpenNeg, onAction, onStageMoney, onView, o
     <div>
       <div className="dh"><h1>#{d.external_ref}</h1>
         <span className="sub">{d.initiators?.name} · CPT {d.cpt_code} · {d.plans?.name} · {d.workflow_state}</span>
+        {d.win_prob != null && (() => { const wp = Math.round(Number(d.win_prob) * 100); const tone = wp >= 60 ? "sage" : wp >= 40 ? "amber" : "red"; return <span className={"badge b-" + tone} style={{ marginLeft: 10 }} title="Modeled plan-prevail probability — open Explain for the full driver breakdown"><i className={"dot d-" + tone} />{wp}% win</span>; })()}
         <span style={{ marginLeft: "auto", display: "flex", gap: 8 }}>
           <button className="mini" onClick={onExplain}>Explain ⓘ</button>
           <a className="mini" href={`/dispute/${d.id}`}>Open IDR case →</a>

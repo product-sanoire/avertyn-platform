@@ -111,7 +111,7 @@ export function InitiatorsView({ orgId, onErr }) {
 }
 
 // ============================================================ Deadlines & delivery
-export function DeadlinesView({ orgId, onErr }) {
+export function DeadlinesView({ orgId, onErr, embedded }) {
   const [dls, setDls] = useState([]);
   const [status, setStatus] = useState(null);
   const [outbox, setOutbox] = useState([]);
@@ -157,10 +157,10 @@ export function DeadlinesView({ orgId, onErr }) {
 
   return (
     <div>
-      <div className="dh"><h1>Deadlines &amp; delivery</h1>
-        <span className="sub">Never miss a window — the rail that kills default losses, plus the alerts that actually go out</span></div>
+      {!embedded && <div className="dh"><h1>Deadlines &amp; delivery</h1>
+        <span className="sub">Never miss a window — the rail that kills default losses, plus the alerts that actually go out</span></div>}
 
-      <div className="cards" style={{ marginTop: 14 }}>
+      <div className="cards" style={{ marginTop: embedded ? 4 : 14 }}>
         <div className="kpi-tile"><div className="l">Open windows</div><div className="n">{dls.length}</div></div>
         <div className="kpi-tile"><div className="l">Overdue</div><div className="n">{overdue}</div><div className={"goal" + (overdue ? " bad" : " good")}>{overdue ? "act now" : "none missed"}</div></div>
         <div className="kpi-tile"><div className="l">Due ≤ 72h</div><div className="n">{soon}</div><div className="goal">business-day aware</div></div>
@@ -229,7 +229,7 @@ async function sha256Hex(s) {
   return [...new Uint8Array(b)].map((x) => x.toString(16).padStart(2, "0")).join("");
 }
 
-export function IntegrationsView({ onErr }) {
+export function IntegrationsView({ onErr, embedded }) {
   const [tokens, setTokens] = useState([]);
   const [logs, setLogs] = useState([]);
   const [name, setName] = useState("");
@@ -287,8 +287,8 @@ export function IntegrationsView({ onErr }) {
 
   return (
     <div>
-      <div className="dh"><h1>Integrations · Eligibility API</h1>
-        <span className="sub">Embed Avertyn's NSA eligibility pre-screen in a clearinghouse or another TPA — the distribution play</span></div>
+      {!embedded && <div className="dh"><h1>Integrations · Eligibility API</h1>
+        <span className="sub">Embed Avertyn's NSA eligibility pre-screen in a clearinghouse or another TPA — the distribution play</span></div>}
 
       {fresh && (
         <div className="panel" style={{ borderColor: "var(--ok)" }}>

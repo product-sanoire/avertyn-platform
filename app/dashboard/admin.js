@@ -35,8 +35,8 @@ export function AdminView({ orgId, onErr }) {
       </div>
       {seg === "access" ? <AccessView orgId={orgId} onErr={onErr} />
         : seg === "reports" ? <ReportsView orgId={orgId} onErr={onErr} />
-        : seg === "alerts" ? <DeadlinesView orgId={orgId} onErr={onErr} />
-        : <IntegrationsView onErr={onErr} />}
+        : seg === "alerts" ? <DeadlinesView orgId={orgId} onErr={onErr} embedded />
+        : <IntegrationsView onErr={onErr} embedded />}
     </div>
   );
 }

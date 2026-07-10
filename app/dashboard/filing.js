@@ -126,6 +126,17 @@ export function FilingView({ orgId, onErr, initialBatch, onConsumeInitial }) {
               <span className="act"><span className={"badge b-" + (STATUS_TONE[selBatch.status] || "grey")}>{STATUS_LABEL[selBatch.status] || selBatch.status}</span></span>
             </div>
             <div className="pb" style={{ paddingTop: 12 }}>
+              {lines.length > 0 && (() => {
+                const dem = lines.reduce((a, l) => a + Number(l.demand_amount || 0), 0);
+                const q = lines.reduce((a, l) => a + Number(l.qpa_amount || 0), 0);
+                return (
+                  <div className="cards" style={{ marginBottom: 16 }}>
+                    <div className="kpi-tile"><div className="l">Lines</div><div className="n">{lines.length}</div></div>
+                    <div className="kpi-tile"><div className="l">Total demand</div><div className="n">{money(dem)}</div></div>
+                    <div className="kpi-tile"><div className="l">At stake vs QPA</div><div className="n">{money(dem - q)}</div><div className="goal">defended if it holds</div></div>
+                  </div>
+                );
+              })()}
               {/* IDRE selection */}
               <div className="rlabel">Certified IDRE</div>
               {(() => { const s = selFor(selBatch.id); return (

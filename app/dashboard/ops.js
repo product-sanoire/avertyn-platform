@@ -234,7 +234,7 @@ function driverList(drivers) {
   return [String(drivers)];
 }
 const RECO_TONE = { challenge: "red", defend: "teal", settle: "amber" };
-export function PredictionsView({ onErr, onOpen }) {
+export function PredictionsView({ onErr, onOpen, embedded }) {
   const [preds, setPreds] = useState([]);
   const load = useCallback(async () => {
     const { data, error } = await supabase.from("predictions")
@@ -250,6 +250,54 @@ export function PredictionsView({ onErr, onOpen }) {
 
   const avgWin = preds.length ? Math.round(preds.reduce((a, p) => a + Number(p.win_prob || 0), 0) / preds.length * 100) : 0;
   const totalEV = preds.reduce((a, p) => a + Number(p.expected_value || 0), 0);
+
+  const rowEls = preds.map((p) => {
+    const wp = Math.round(Number(p.win_prob || 0) * 100);
+    const d = p.disputes || {};
+    return (
+      <div key={p.id} className="frow" style={{ alignItems: "flex-start", cursor: onOpen ? "pointer" : "default" }} onClick={() => onOpen && onOpen(p.dispute_id)}>
+        <div style={{ flex: 1 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <b>#{d.external_ref || "—"}</b>
+            <span className="muted" style={{ fontSize: 11.5 }}>CPT {d.cpt_code}</span>
+            <span className={"badge b-" + (RECO_TONE[p.recommended] || "grey")}>{p.recommended}</span>
+          </div>
+          <div className="track" style={{ marginTop: 7, maxWidth: 320 }}>
+            <div className="fill" style={{ width: wp + "%", background: wp >= 60 ? "var(--ok)" : wp >= 40 ? "var(--warn)" : "var(--sig)" }} />
+          </div>
+          <div className="sub" style={{ marginTop: 5 }}>
+            {wp}% plan-prevails · optimal offer {money(p.recommended_offer)} · EV {money(p.expected_value)}
+            {p.model_version ? " · " + p.model_version : ""}
+          </div>
+          {driverList(p.drivers).length > 0 && (
+            <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginTop: 7 }}>
+              {driverList(p.drivers).slice(0, 4).map((dr, i) => <span key={i} className="badge b-grey">{dr}</span>)}
+            </div>
+          )}
+        </div>
+        <div style={{ textAlign: "right" }}>
+          <div className="mono" style={{ fontWeight: 600 }}>{money(d.demand_amount)}</div>
+          <div className="muted" style={{ fontSize: 11 }}>QPA {money(d.qpa_amount)}</div>
+        </div>
+      </div>
+    );
+  });
+
+  // Embedded: a native Overview panel (no page header / KPI cards) so it reads as
+  // part of the command center rather than a pasted-in screen.
+  if (embedded) {
+    return (
+      <div className="panel" style={{ marginTop: 18 }}>
+        <div className="ph">Predicted outcomes
+          <span className="act"><span className="muted" style={{ fontSize: 11 }}>{preds.length ? `${preds.length} modeled · avg ${avgWin}% plan-prevails · ${money(totalEV)} modeled EV` : "win-probability & optimal-offer model"}</span></span>
+        </div>
+        {preds.length === 0
+          ? <p className="muted" style={{ padding: 16 }}>No predictions yet — run “Predict outcome” on a case.</p>
+          : <div className="pb" style={{ paddingTop: 10 }}>{rowEls}</div>}
+      </div>
+    );
+  }
+
   return (
     <div>
       <div className="dh"><h1>Predictions</h1><span className="sub">Win-probability &amp; optimal-offer model · what the agent acts on</span></div>
@@ -258,41 +306,8 @@ export function PredictionsView({ onErr, onOpen }) {
         <div className="kpi-tile"><div className="l">Avg plan-prevail</div><div className="n">{avgWin}%</div></div>
         <div className="kpi-tile"><div className="l">Modeled expected value</div><div className="n">{money(totalEV)}</div></div>
       </div>
-      {preds.length === 0 ? <div className="empty"><div className="eh">No predictions yet</div><div className="es">Run the model to score win-probability and the optimal offer per dispute.</div></div> : (
-        <div className="panel"><div className="pb" style={{ paddingTop: 10 }}>
-          {preds.map((p) => {
-            const wp = Math.round(Number(p.win_prob || 0) * 100);
-            const d = p.disputes || {};
-            return (
-              <div key={p.id} className="frow" style={{ alignItems: "flex-start", cursor: onOpen ? "pointer" : "default" }} onClick={() => onOpen && onOpen(p.dispute_id)}>
-                <div style={{ flex: 1 }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                    <b>#{d.external_ref || "—"}</b>
-                    <span className="muted" style={{ fontSize: 11.5 }}>CPT {d.cpt_code}</span>
-                    <span className={"badge b-" + (RECO_TONE[p.recommended] || "grey")}>{p.recommended}</span>
-                  </div>
-                  <div className="track" style={{ marginTop: 7, maxWidth: 320 }}>
-                    <div className="fill" style={{ width: wp + "%", background: wp >= 60 ? "var(--ok)" : wp >= 40 ? "var(--warn)" : "var(--sig)" }} />
-                  </div>
-                  <div className="sub" style={{ marginTop: 5 }}>
-                    {wp}% plan-prevails · optimal offer {money(p.recommended_offer)} · EV {money(p.expected_value)}
-                    {p.model_version ? " · " + p.model_version : ""}
-                  </div>
-                  {driverList(p.drivers).length > 0 && (
-                    <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginTop: 7 }}>
-                      {driverList(p.drivers).slice(0, 4).map((dr, i) => <span key={i} className="badge b-grey">{dr}</span>)}
-                    </div>
-                  )}
-                </div>
-                <div style={{ textAlign: "right" }}>
-                  <div className="mono" style={{ fontWeight: 600 }}>{money(d.demand_amount)}</div>
-                  <div className="muted" style={{ fontSize: 11 }}>QPA {money(d.qpa_amount)}</div>
-                </div>
-              </div>
-            );
-          })}
-        </div></div>
-      )}
+      {preds.length === 0 ? <div className="empty"><div className="eh">No predictions yet</div><div className="es">Run the model to score win-probability and the optimal offer per dispute.</div></div>
+        : <div className="panel"><div className="pb" style={{ paddingTop: 10 }}>{rowEls}</div></div>}
     </div>
   );
 }
