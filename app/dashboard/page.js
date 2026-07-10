@@ -318,15 +318,29 @@ export default function Dashboard() {
           <PredictionsView embedded onErr={setErr} onOpen={(id) => { setSel(id); setTab(1); setStage("all"); }} />
         </div>
       ) : tab === 2 ? (
-        <div style={{ flex: 1, overflow: "auto", padding: "20px 26px" }}>
-          <div className="seg" style={{ marginBottom: 8 }}>
-            {INTEL.map(([k, l]) => <button key={k} className={intel === k ? "on" : ""} onClick={() => setIntel(k)}>{l}</button>)}
+        <div style={{ flex: 1, overflow: "auto", padding: "22px 26px" }}>
+          <div className="shead">
+            <div className="stitle">
+              <h1>Intelligence</h1>
+              <span className="sub">{intel === "exposure"
+                ? "What IDR is costing each plan sponsor — the view your brokers distribute"
+                : "Who's filing against your plans, how weak their filings are, and how each IDRE behaves — your negotiation leverage"}</span>
+            </div>
+            <div className="seg">
+              {INTEL.map(([k, l]) => <button key={k} className={intel === k ? "on" : ""} onClick={() => setIntel(k)}>{l}</button>)}
+            </div>
           </div>
-          {intel === "exposure" ? <ExposureView exposure={exposure} /> : <InitiatorsView orgId={orgId} onErr={setErr} />}
+          {intel === "exposure" ? <ExposureView exposure={exposure} embedded /> : <InitiatorsView orgId={orgId} onErr={setErr} embedded />}
         </div>
       ) : tab === 3 ? (
         <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}>
-          <div style={{ padding: "18px 24px 10px" }}>
+          <div className="shead" style={{ padding: "22px 26px 15px", margin: 0, flexWrap: "wrap" }}>
+            <div className="stitle">
+              <h1>Workspace</h1>
+              <span className="sub">{ws === "inbox" ? "Payer & provider correspondence tied to your cases"
+                : ws === "tasks" ? "Your team's open work, prioritized"
+                : "Business-day, holiday-aware windows & events"}</span>
+            </div>
             <div className="seg">
               {WORKSPACE.map(([k, l]) => <button key={k} className={ws === k ? "on" : ""} onClick={() => setWs(k)}>{l}</button>)}
             </div>
@@ -334,8 +348,8 @@ export default function Dashboard() {
           {ws === "inbox" ? (
             <div style={{ flex: 1, overflow: "hidden" }}><InboxView email={email} orgId={orgId} onErr={setErr} /></div>
           ) : (
-            <div style={{ flex: 1, overflow: "auto", padding: "0 24px 22px" }}>
-              {ws === "tasks" ? <TasksView email={email} orgId={orgId} userId={userId} onErr={setErr} /> : <CalendarView onErr={setErr} />}
+            <div style={{ flex: 1, overflow: "auto", padding: "18px 24px 22px" }}>
+              {ws === "tasks" ? <TasksView email={email} orgId={orgId} userId={userId} onErr={setErr} embedded /> : <CalendarView onErr={setErr} embedded />}
             </div>
           )}
         </div>
@@ -594,7 +608,7 @@ function Tile({ l, n, goal, good, bad, prog, tone }) {
   );
 }
 
-function ExposureView({ exposure }) {
+function ExposureView({ exposure, embedded }) {
   const totalRisk = exposure.reduce((a, e) => a + Number(e.at_risk || 0), 0);
   const totalDef = exposure.reduce((a, e) => a + Number(e.defended || 0), 0);
   function printBrief() {
@@ -623,9 +637,11 @@ td{padding:11px 10px;border-bottom:1px solid #efeade}td.n{text-align:right;font-
   }
   return (
     <div>
-      <div className="dh"><h1>Exposure</h1><span className="sub">What IDR is costing each plan sponsor — the view your brokers distribute</span>
-        <button className="mini" style={{ marginLeft: "auto" }} disabled={!exposure.length} onClick={printBrief}>Export broker brief →</button></div>
-      <div className="cards" style={{ marginTop: 14 }}>
+      {embedded
+        ? <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 4 }}><button className="mini" disabled={!exposure.length} onClick={printBrief}>Export broker brief →</button></div>
+        : <div className="dh"><h1>Exposure</h1><span className="sub">What IDR is costing each plan sponsor — the view your brokers distribute</span>
+          <button className="mini" style={{ marginLeft: "auto" }} disabled={!exposure.length} onClick={printBrief}>Export broker brief →</button></div>}
+      <div className="cards" style={{ marginTop: embedded ? 4 : 14 }}>
         <Tile l="Employers" n={exposure.length} />
         <Tile l="Total at risk (open)" n={money(totalRisk)} />
         <Tile l="Defended to date" n={money(totalDef)} />
