@@ -39,6 +39,9 @@ function downloadCSV(name, rows, cols) {
 const DOC_STATUS_LABEL = { draft: "Draft", in_review: "In review", approved: "Approved", filed: "Filed" };
 const DOC_STATUS_TONE = { draft: "grey", in_review: "amber", approved: "green", filed: "ink" };
 const DOC_STATUS_RANK = { draft: 1, in_review: 2, approved: 3, filed: 4 };
+// Negotiation-offer lifecycle
+const OFFER_STATUS_LABEL = { open: "Open", countered: "Countered", accepted: "Accepted", rejected: "Rejected", withdrawn: "Withdrawn" };
+const OFFER_STATUS_TONE = { open: "amber", countered: "grey", accepted: "green", rejected: "red", withdrawn: "grey" };
 function briefMapFrom(docs) {
   const m = {};
   for (const d of docs || []) {
@@ -175,7 +178,7 @@ export default function Dashboard() {
         supabase.from("eligibility_findings").select("result, detail, eligibility_rules(name, severity)").eq("dispute_id", id),
         supabase.from("qpa_records").select("*").eq("dispute_id", id).maybeSingle(),
         supabase.from("documents").select("id, kind, title, status, esign_status, signed_by, signed_at, created_at, content").eq("dispute_id", id).order("created_at", { ascending: false }),
-        supabase.from("offers").select("id, party, kind, amount, note, submitted_at").eq("dispute_id", id).order("submitted_at", { ascending: true }),
+        supabase.from("offers").select("id, party, kind, amount, pct_of_qpa, round_no, status, note, submitted_at").eq("dispute_id", id).order("round_no", { ascending: true, nullsFirst: true }).order("submitted_at", { ascending: true }),
       ]);
       setDetail({ d, find: find || [], qpa: q || null, docs: docs || [], offers: offs || [] });
     } catch (e) { setErr(e.message); }
@@ -898,7 +901,7 @@ function Detail({ dd, onRun, onDoc, onOpenNeg, onAction, onStageMoney, onView, o
       )}
 
       <div className="panel">
-        <div className="ph">Offers &amp; negotiation
+        <div className="ph">Negotiation History
           <span className="act">
             <button className="btn btn-s" style={{ padding: "6px 11px" }} disabled={busy === "oneg" || hasOnp} onClick={onOpenNeg}>
               {busy === "oneg" ? "Sending…" : hasOnp ? "Open-negotiation sent" : "Send open-negotiation offer"}
@@ -906,12 +909,37 @@ function Detail({ dd, onRun, onDoc, onOpenNeg, onAction, onStageMoney, onView, o
           </span>
         </div>
         <div className="pb">
-          {(!offers || offers.length === 0) ? <p className="muted">No offers yet. Open a negotiation to settle at ~125% of QPA before any IDR fee — the cheapest win.</p> : offers.map((o) => (
-            <div key={o.id} className="frow" style={{ alignItems: "center" }}>
-              <span className={"badge b-" + (o.party === "plan" ? "ink" : "amber")}>{o.party}</span>
-              <div style={{ flex: 1 }}><b className="mono">{money(o.amount)}</b><div className="sub">{o.kind?.replace(/_/g, " ")}{o.note ? " · " + o.note : ""}</div></div>
-            </div>
-          ))}
+          {(() => {
+            const qpaAmt = Number(d.qpa_amount || 0);
+            const fh = Number(qpa?.benchmark_fairhealth || 0);
+            const bench = fh > 0 ? { v: fh, label: "FAIR Health median" } : (qpa?.defensible_ceiling ? { v: Number(qpa.defensible_ceiling), label: "defensible ceiling" } : null);
+            if (!offers || offers.length === 0) return <p className="muted">No offers yet. Open a negotiation to settle at ~125% of QPA before any IDR fee — the cheapest win.</p>;
+            return (<>
+              {bench && <div className="muted" style={{ fontSize: 11.5, marginBottom: 8 }}>Each offer shown against the QPA and the {bench.label} ({money(bench.v)}).</div>}
+              {offers.map((o) => {
+                const qp = o.pct_of_qpa != null ? Number(o.pct_of_qpa) : (qpaAmt > 0 ? Math.round(o.amount / qpaAmt * 1000) / 10 : null);
+                const bp = bench ? Math.round(o.amount / bench.v * 100) : null;
+                const overBench = bench ? o.amount > bench.v : false;
+                return (
+                  <div key={o.id} className="frow" style={{ alignItems: "center", gap: 10 }}>
+                    <span className="mono muted" style={{ minWidth: 24, fontSize: 12 }}>#{o.round_no ?? "—"}</span>
+                    <span className={"badge b-" + (o.party === "plan" ? "ink" : "amber")} style={{ minWidth: 70, justifyContent: "center" }}>{o.party === "plan" ? "Plan" : "Provider"}</span>
+                    <div style={{ flex: 1 }}>
+                      <b className="mono">{money(o.amount)}</b>
+                      {qp != null && <span className="mono" style={{ marginLeft: 8, fontSize: 12, color: "var(--ink)" }}>{qp}% of QPA</span>}
+                      <div className="sub">{o.kind?.replace(/_/g, " ")}{o.note ? " · " + o.note : ""}</div>
+                    </div>
+                    {bp != null && (
+                      <span className={"badge b-" + (overBench ? "red" : "green")} title={`${o.party === "plan" ? "Plan" : "Provider"} offer vs ${bench.label} (${money(bench.v)})`}>
+                        <i className={"dot d-" + (overBench ? "red" : "green")} />{bp}% of {fh > 0 ? "FAIR Health" : "ceiling"} · {overBench ? "above" : "at/below"}
+                      </span>
+                    )}
+                    {o.status && <span className={"badge b-" + (OFFER_STATUS_TONE[o.status] || "grey")}>{OFFER_STATUS_LABEL[o.status] || o.status}</span>}
+                  </div>
+                );
+              })}
+            </>);
+          })()}
         </div>
       </div>
 
