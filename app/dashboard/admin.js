@@ -5,14 +5,14 @@
 //   • Integrations — the eligibility pre-screen API (reused Tier-A view)
 import { useEffect, useState, useCallback } from "react";
 import { supabase } from "../../lib/supabaseClient";
-import { IntegrationsView } from "./tiera";
+import { IntegrationsView, DeadlinesView } from "./tiera";
 
 const ROLES = ["admin", "manager", "analyst", "auditor", "viewer"];
 const METRICS = [["count", "Dispute count"], ["defended", "Dollars defended"], ["demand", "Total demand"], ["qpa", "Total QPA"], ["avg_score", "Avg ineligibility"]];
 const DIMS = [["initiator", "Initiator"], ["plan", "Plan"], ["state", "Workflow state"], ["cpt", "CPT"], ["month", "Month"]];
 const CADENCE = ["hourly", "daily", "weekly", "monthly"];
 const SCIM_BASE = (process.env.NEXT_PUBLIC_SUPABASE_URL || "https://ssjougrsaecdwfuxeasd.supabase.co") + "/functions/v1/scim";
-const ADMIN = [["access", "Access"], ["reports", "Reports"], ["integrations", "Integrations"]];
+const ADMIN = [["access", "Access"], ["reports", "Reports"], ["alerts", "Alerts"], ["integrations", "Integrations"]];
 
 async function sha256Hex(s) {
   const b = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(s));
@@ -35,6 +35,7 @@ export function AdminView({ orgId, onErr }) {
       </div>
       {seg === "access" ? <AccessView orgId={orgId} onErr={onErr} />
         : seg === "reports" ? <ReportsView orgId={orgId} onErr={onErr} />
+        : seg === "alerts" ? <DeadlinesView orgId={orgId} onErr={onErr} />
         : <IntegrationsView onErr={onErr} />}
     </div>
   );

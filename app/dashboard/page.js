@@ -2,19 +2,19 @@
 import { useEffect, useState, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "../../lib/supabaseClient";
-import { money } from "../../lib/format";
+import { money, untilLabel } from "../../lib/format";
 import { InboxView, TasksView, CalendarView, PredictionsView } from "./ops";
-import { InitiatorsView, DeadlinesView } from "./tiera";
+import { InitiatorsView } from "./tiera";
 import { ImportHub } from "./import";
 import { CommandPalette } from "./palette";
 import { FilingView } from "./filing";
 import { AdminView } from "./admin";
 import { ExplainModal } from "./explain";
 
-const TABS = ["Overview", "Disputes", "Deadlines", "Intelligence", "Workspace", "Filing", "Admin"];
-const INTEL = [["initiators", "Initiators & IDREs"], ["exposure", "Employer exposure"], ["predictions", "Predictions"]];
+const TABS = ["Overview", "Cases", "Intelligence", "Workspace", "Filing", "Admin"];
+const INTEL = [["initiators", "Initiators & IDREs"], ["exposure", "Employer exposure"]];
 const WORKSPACE = [["inbox", "Inbox"], ["tasks", "Tasks"], ["calendar", "Calendar"]];
-const STAGES = [["all", "All"], ["incoming", "Incoming"], ["eligibility", "Eligibility"], ["qpa", "QPA defense"], ["respond", "Respond & pay"]];
+const STAGES = [["all", "All"], ["due", "Due soon"], ["incoming", "Incoming"], ["eligibility", "Eligibility"], ["qpa", "QPA defense"], ["respond", "Respond & pay"]];
 const mkg = { pass: ["pass", "✓"], fail: ["fail", "×"], warn: ["warn", "!"], na: ["na", "–"] };
 
 // Friendly labels for autonomy action codes.
@@ -64,6 +64,7 @@ export default function Dashboard() {
   const [importOpen, setImportOpen] = useState(false);
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [explainId, setExplainId] = useState(null);
+  const [filingBatch, setFilingBatch] = useState(null);
   const [docView, setDocView] = useState(null);
   const [moneyRel, setMoneyRel] = useState(null);
   const [tab, setTab] = useState(0);
@@ -190,6 +191,21 @@ export default function Dashboard() {
     catch (e) { setErr(e.message || "Bulk action failed."); }
     setBusy("");
   }
+  // Build a batch from the selected cases and jump to Filing (batch → IDRE → file).
+  async function batchAndFile() {
+    if (!selected.size) return;
+    setBusy("bulk"); setErr("");
+    try {
+      const { data, error } = await supabase.rpc("execute_batch_action", { p_action: "build_batch", p_params: { dispute_ids: Array.from(selected) }, p_actor: "operator", p_rationale: "Batch & file from case queue" });
+      if (error) throw error;
+      if (data && data.ok === false) throw new Error(data.reason === "over_50_line_cap" ? "A batch can hold at most 50 lines." : (data.reason || "Couldn't build the batch."));
+      setSelected(new Set());
+      setFilingBatch(data?.effect?.batch_id || null);
+      setTab(4);
+      await loadShell();
+    } catch (e) { setErr(e.message || "Batch & file failed."); }
+    setBusy("");
+  }
 
   const runEngine = () => act("engine", () => rpc("run_eligibility", { p_dispute: sel }));
   const runAutopilot = () => act("auto", () => orgId && rpc("bavert_tick_all", { p_org: orgId }));
@@ -243,6 +259,7 @@ export default function Dashboard() {
   // ---- tab filters ---------------------------------------------------------
   const filtered = (() => {
     if (tab !== 1 || stage === "all") return rows;
+    if (stage === "due") return rows.filter((r) => { const t = r.respond_by || r.pay_by; if (!t) return false; return (new Date(t).getTime() - Date.now()) / 3.6e6 <= 72; });
     if (stage === "incoming") return rows.filter((r) => ["intake", "triage"].includes(r.workflow_state));
     if (stage === "eligibility") return rows.filter((r) => (r.eligibility_score || 0) >= 60 || ["intake", "triage", "eligibility_review"].includes(r.workflow_state));
     if (stage === "qpa") return rows.filter((r) => r.workflow_state === "qpa_defense" || r.workflow_state === "response_prep");
@@ -286,21 +303,16 @@ export default function Dashboard() {
           <CommandCenter metrics={metrics} score={score} awardsM={awardsM} agentM={agentM}
             scorecard={scorecard} gap={gap} onVerify={verifyLedger} onExport={exportData}
             onAutopilot={runAutopilot} busy={busy} verify={verify} />
+          <PredictionsView onErr={setErr} onOpen={(id) => { setSel(id); setTab(1); setStage("all"); }} />
         </div>
       ) : tab === 2 ? (
-        <div style={{ flex: 1, overflow: "auto", padding: 22 }}>
-          <DeadlinesView orgId={orgId} onErr={setErr} />
-        </div>
-      ) : tab === 3 ? (
         <div style={{ flex: 1, overflow: "auto", padding: "20px 26px" }}>
           <div className="seg" style={{ marginBottom: 8 }}>
             {INTEL.map(([k, l]) => <button key={k} className={intel === k ? "on" : ""} onClick={() => setIntel(k)}>{l}</button>)}
           </div>
-          {intel === "initiators" ? <InitiatorsView orgId={orgId} onErr={setErr} />
-            : intel === "exposure" ? <ExposureView exposure={exposure} />
-            : <PredictionsView onErr={setErr} onOpen={(id) => { setSel(id); setTab(1); setStage("all"); }} />}
+          {intel === "exposure" ? <ExposureView exposure={exposure} /> : <InitiatorsView orgId={orgId} onErr={setErr} />}
         </div>
-      ) : tab === 4 ? (
+      ) : tab === 3 ? (
         <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}>
           <div style={{ padding: "18px 24px 10px" }}>
             <div className="seg">
@@ -315,18 +327,18 @@ export default function Dashboard() {
             </div>
           )}
         </div>
-      ) : tab === 5 ? (
+      ) : tab === 4 ? (
         <div style={{ flex: 1, overflow: "auto", padding: 22 }}>
-          <FilingView orgId={orgId} onErr={setErr} />
+          <FilingView orgId={orgId} onErr={setErr} initialBatch={filingBatch} onConsumeInitial={() => setFilingBatch(null)} />
         </div>
-      ) : tab === 6 ? (
+      ) : tab === 5 ? (
         <div style={{ flex: 1, overflow: "auto", padding: 22 }}>
           <AdminView orgId={orgId} onErr={setErr} />
         </div>
       ) : (
         <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}>
           <div style={{ padding: "16px 24px 12px", display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
-            <h1 style={{ fontFamily: "var(--disp)", fontSize: 25, margin: 0, letterSpacing: "-.02em" }}>Disputes</h1>
+            <h1 style={{ fontFamily: "var(--disp)", fontSize: 25, margin: 0, letterSpacing: "-.02em" }}>Cases</h1>
             <div className="seg">
               {STAGES.map(([k, label]) => (
                 <button key={k} className={stage === k ? "on" : ""} onClick={() => setStage(k)}>{label}</button>
@@ -337,6 +349,7 @@ export default function Dashboard() {
                 <span className="badge b-ink">{selected.size} selected</span>
                 <button className="mini" disabled={busy === "bulk"} onClick={() => runBulk((id) => rpc("run_eligibility", { p_dispute: id }))}>{busy === "bulk" ? "Working…" : "Run engine"}</button>
                 <button className="mini" disabled={busy === "bulk"} onClick={() => runBulk((id) => rpc("execute_action", { p_action: "predict_outcome", p_dispute: id, p_params: {}, p_actor: email, p_rationale: "Bulk predict" }))}>Predict</button>
+                <button className="mini" disabled={busy === "bulk"} onClick={batchAndFile}>Batch &amp; file →</button>
                 <button className="mini" onClick={() => setSelected(new Set())}>Clear</button>
               </div>
             )}
@@ -368,6 +381,7 @@ export default function Dashboard() {
                           <b>#{r.external_ref}</b>
                         </label>
                         <span className="badge"><i className={"dot d-" + rd.tone} />{rd.label}</span>
+                        {(() => { const t = r.respond_by || r.pay_by; if (!t) return null; const h = (new Date(t).getTime() - Date.now()) / 3.6e6; if (h > 168) return null; const od = h < 0; return <span className={"badge " + (od ? "b-red" : h <= 72 ? "b-amber" : "b-grey")} style={{ marginLeft: "auto" }} title="Response / payment window"><i className={"dot d-" + (od ? "red" : h <= 72 ? "amber" : "grey")} />{untilLabel(t)}</span>; })()}
                       </div>
                       <div className="r2">{r.initiators?.name || "—"} · {money(r.demand_amount)} · {r.workflow_state}</div>
                     </div>

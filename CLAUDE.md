@@ -43,10 +43,15 @@ repository set") and it cannot be fixed mid-session. Two workarounds:
 ## Product
 
 Plan-side / TPA **No Surprises Act IDR defense** platform. Core surfaces (dashboard tabs):
-Overview, Disputes, Deadlines, Intelligence (initiators / exposure / predictions),
-Workspace (inbox / tasks / calendar), Filing (batch → IDRE → file), Admin
-(access / reports / integrations). Explainability is a glass-box "Explain" modal on
-any dispute (`explain_dispute` + `qpa_explain`).
+Overview (KPIs + cross-case predictions), **Cases** (the dispute queue — the work object;
+"dispute"/"IDR dispute" stays the precise domain term inside a case), Intelligence
+(initiators / exposure), Workspace (inbox / tasks / calendar), Filing (batch → IDRE →
+file), Admin (access / reports / alerts / integrations).
+
+IA notes: deadlines are integrated into Cases (per-row countdown chip + "Due soon"
+filter), not a separate tab; the alert scan/dispatch machinery lives under Admin → Alerts.
+Filing is also reachable from the Cases queue via multi-select → "Batch & file".
+Explainability is a glass-box "Explain" modal on any case (`explain_dispute` + `qpa_explain`).
 
 ## Stubs waiting on the user's credentials (flip to live when provided)
 

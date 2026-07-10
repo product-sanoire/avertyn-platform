@@ -10,7 +10,7 @@ const STATUS_TONE = { draft: "grey", idre_pending: "amber", filed: "green" };
 const STATUS_LABEL = { draft: "Draft", idre_pending: "IDRE pending", filed: "Filed" };
 const STEPS = [["draft", "Built"], ["idre_pending", "IDRE selected"], ["filed", "Filed"]];
 
-export function FilingView({ orgId, onErr }) {
+export function FilingView({ orgId, onErr, initialBatch, onConsumeInitial }) {
   const [batches, setBatches] = useState([]);
   const [sels, setSels] = useState([]);      // idre_selections (latest per batch)
   const [subs, setSubs] = useState([]);      // portal_submissions
@@ -39,6 +39,8 @@ export function FilingView({ orgId, onErr }) {
     } catch (er) { onErr(er.message); }
   }, [onErr]);
   useEffect(() => { load(); }, [load]);
+  // Preselect a batch handed over from the Cases queue ("Batch & file").
+  useEffect(() => { if (initialBatch) { setSel(initialBatch); onConsumeInitial && onConsumeInitial(); } }, [initialBatch]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (!sel) { setLines([]); return; }
