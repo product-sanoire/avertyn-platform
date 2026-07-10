@@ -4,6 +4,7 @@
 //   • Reports  — scheduled reports (pg_cron) over the custom-report engine
 //   • Integrations — the eligibility pre-screen API (reused Tier-A view)
 import { useEffect, useState, useCallback } from "react";
+import { ApiKeysView } from "./ApiKeys";
 import { supabase } from "../../lib/supabaseClient";
 import { useLive } from "../../lib/useLive";
 import { IntegrationsView, DeadlinesView } from "./tiera";
@@ -13,7 +14,7 @@ const METRICS = [["count", "Dispute count"], ["defended", "Dollars defended"], [
 const DIMS = [["initiator", "Initiator"], ["plan", "Plan"], ["state", "Workflow state"], ["cpt", "CPT"], ["month", "Month"]];
 const CADENCE = ["hourly", "daily", "weekly", "monthly"];
 const SCIM_BASE = (process.env.NEXT_PUBLIC_SUPABASE_URL || "https://ssjougrsaecdwfuxeasd.supabase.co") + "/functions/v1/scim";
-const ADMIN = [["access", "Access"], ["reports", "Reports"], ["alerts", "Alerts"], ["qpa", "QPA index"], ["integrations", "Integrations"]];
+const ADMIN = [["access", "Access"], ["reports", "Reports"], ["alerts", "Alerts"], ["qpa", "QPA index"], ["integrations", "Integrations"], ["api", "API"]];
 
 async function sha256Hex(s) {
   const b = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(s));
@@ -42,7 +43,8 @@ export function AdminView({ orgId, onErr }) {
         : seg === "reports" ? <ReportsView orgId={orgId} onErr={onErr} />
         : seg === "alerts" ? <DeadlinesView orgId={orgId} onErr={onErr} embedded />
         : seg === "qpa" ? <QpaIndexView onErr={onErr} />
-        : <IntegrationsView onErr={onErr} embedded />}
+        : seg === "integrations" ? <IntegrationsView onErr={onErr} embedded />
+        : <ApiKeysView onErr={onErr} />}
     </div>
   );
 }
