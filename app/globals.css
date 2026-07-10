@@ -302,3 +302,21 @@ input,select,textarea{color:var(--ink);font-family:inherit}
 .cmdk-l{font-size:13.5px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .cmdk-s{font-size:11.5px;color:var(--mut);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:1px}
 .cmdk-empty{padding:30px;text-align:center;color:var(--mut);font-size:13.5px}
+
+/* ---------- calendar grid ---------- */
+.calgrid{display:grid;grid-template-columns:repeat(7,1fr)}
+.calhead{border-bottom:1px solid var(--hair)}
+.calh{padding:11px 12px;font-size:10px;letter-spacing:.09em;text-transform:uppercase;color:var(--faint);font-weight:700}
+.calcell{min-height:112px;padding:9px 10px;border-right:1px solid var(--hair);border-bottom:1px solid var(--hair)}
+.calcell:nth-child(7n){border-right:0}
+.calcell.empty{background:var(--card-2)}
+.calcell.today{background:rgba(178,58,32,.045)}
+.caln{font-family:var(--num);font-size:12.5px;font-weight:600;color:var(--ink-2);margin-bottom:6px}
+.calcell.today .caln{color:var(--sig)}
+.calev{font-size:10px;font-weight:600;padding:3px 8px;border-radius:7px;margin-bottom:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:default}
+.calev.b-red{background:var(--sig-soft);color:var(--sig-ink)}
+.calev.b-clay{background:var(--c-clay-s);color:var(--c-clay-ink)}
+.calev.b-indigo{background:var(--c-indigo-s);color:var(--c-indigo-ink)}
+.calev.b-sage{background:var(--c-sage-s);color:var(--c-sage-ink)}
+.calev.b-grey{background:var(--sunk);color:var(--mut)}
+.calmore{font-size:9.5px;color:var(--faint);font-weight:600;margin-top:1px}

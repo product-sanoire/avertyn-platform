@@ -8,8 +8,9 @@ import { InitiatorsView, DeadlinesView, IntegrationsView } from "./tiera";
 import { ImportHub } from "./import";
 import { CommandPalette } from "./palette";
 
-const TABS = ["Overview", "Disputes", "Deadlines", "Intelligence", "Inbox", "Tasks", "Calendar", "Integrations"];
+const TABS = ["Overview", "Disputes", "Deadlines", "Intelligence", "Workspace", "Integrations"];
 const INTEL = [["initiators", "Initiators & IDREs"], ["exposure", "Employer exposure"], ["predictions", "Predictions"]];
+const WORKSPACE = [["inbox", "Inbox"], ["tasks", "Tasks"], ["calendar", "Calendar"]];
 const STAGES = [["all", "All"], ["incoming", "Incoming"], ["eligibility", "Eligibility"], ["qpa", "QPA defense"], ["respond", "Respond & pay"]];
 const mkg = { pass: ["pass", "✓"], fail: ["fail", "×"], warn: ["warn", "!"], na: ["na", "–"] };
 
@@ -64,6 +65,10 @@ export default function Dashboard() {
   const [tab, setTab] = useState(0);
   const [stage, setStage] = useState("all");
   const [intel, setIntel] = useState("initiators");
+  const [dispSort, setDispSort] = useState("deadline");
+  const [dispQuery, setDispQuery] = useState("");
+  const [selected, setSelected] = useState(() => new Set());
+  const [ws, setWs] = useState("inbox");
   const [busy, setBusy] = useState("");
   const [verify, setVerify] = useState(null);
   const [err, setErr] = useState("");
@@ -174,6 +179,13 @@ export default function Dashboard() {
     setBusy("");
   }
   const rpc = async (name, args) => { const { error } = await supabase.rpc(name, args); if (error) throw error; };
+  async function runBulk(perId) {
+    if (!selected.size) return;
+    setBusy("bulk"); setErr("");
+    try { for (const id of Array.from(selected)) { await perId(id); } setSelected(new Set()); await loadShell(); if (sel) await loadDetail(sel); }
+    catch (e) { setErr(e.message || "Bulk action failed."); }
+    setBusy("");
+  }
 
   const runEngine = () => act("engine", () => rpc("run_eligibility", { p_dispute: sel }));
   const runAutopilot = () => act("auto", () => orgId && rpc("bavert_tick_all", { p_org: orgId }));
@@ -234,6 +246,16 @@ export default function Dashboard() {
     return rows;
   })();
   const tabHeader = STAGES.find((s) => s[0] === stage)?.[1] || "All";
+  const displayed = (() => {
+    let arr = filtered;
+    const q = dispQuery.trim().toLowerCase();
+    if (q) arr = arr.filter((r) => (r.external_ref || "").toLowerCase().includes(q) || (r.initiators?.name || "").toLowerCase().includes(q) || (r.cpt_code || "").toLowerCase().includes(q));
+    return [...arr].sort((a, b) => {
+      if (dispSort === "demand") return (b.demand_amount || 0) - (a.demand_amount || 0);
+      if (dispSort === "score") return (b.eligibility_score || 0) - (a.eligibility_score || 0);
+      return new Date(a.respond_by || "2999-01-01").getTime() - new Date(b.respond_by || "2999-01-01").getTime();
+    });
+  })();
 
   return (
     <div className="app">
@@ -275,45 +297,70 @@ export default function Dashboard() {
             : <PredictionsView onErr={setErr} onOpen={(id) => { setSel(id); setTab(1); setStage("all"); }} />}
         </div>
       ) : tab === 4 ? (
-        <div style={{ flex: 1, overflow: "hidden" }}>
-          <InboxView email={email} orgId={orgId} onErr={setErr} />
+        <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}>
+          <div style={{ padding: "18px 24px 10px" }}>
+            <div className="seg">
+              {WORKSPACE.map(([k, l]) => <button key={k} className={ws === k ? "on" : ""} onClick={() => setWs(k)}>{l}</button>)}
+            </div>
+          </div>
+          {ws === "inbox" ? (
+            <div style={{ flex: 1, overflow: "hidden" }}><InboxView email={email} orgId={orgId} onErr={setErr} /></div>
+          ) : (
+            <div style={{ flex: 1, overflow: "auto", padding: "0 24px 22px" }}>
+              {ws === "tasks" ? <TasksView email={email} orgId={orgId} userId={userId} onErr={setErr} /> : <CalendarView onErr={setErr} />}
+            </div>
+          )}
         </div>
       ) : tab === 5 ? (
-        <div style={{ flex: 1, overflow: "auto", padding: 22 }}>
-          <TasksView email={email} orgId={orgId} userId={userId} onErr={setErr} />
-        </div>
-      ) : tab === 6 ? (
-        <div style={{ flex: 1, overflow: "auto", padding: 22 }}>
-          <CalendarView onErr={setErr} />
-        </div>
-      ) : tab === 7 ? (
         <div style={{ flex: 1, overflow: "auto", padding: 22 }}>
           <IntegrationsView onErr={setErr} />
         </div>
       ) : (
         <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}>
-          <div style={{ padding: "16px 24px 12px", display: "flex", alignItems: "center", gap: 13, flexWrap: "wrap" }}>
+          <div style={{ padding: "16px 24px 12px", display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
             <h1 style={{ fontFamily: "var(--disp)", fontSize: 25, margin: 0, letterSpacing: "-.02em" }}>Disputes</h1>
             <div className="seg">
               {STAGES.map(([k, label]) => (
                 <button key={k} className={stage === k ? "on" : ""} onClick={() => setStage(k)}>{label}</button>
               ))}
             </div>
-            <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 10 }}>
-              <span className="muted" style={{ fontSize: 12.5 }}>{filtered.length} in view</span>
-              <button className="mini" onClick={() => downloadCSV("avertyn-disputes.csv", filtered, DISPUTE_CSV_COLS)}>Export CSV</button>
+            {selected.size > 0 && (
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <span className="badge b-ink">{selected.size} selected</span>
+                <button className="mini" disabled={busy === "bulk"} onClick={() => runBulk((id) => rpc("run_eligibility", { p_dispute: id }))}>{busy === "bulk" ? "Working…" : "Run engine"}</button>
+                <button className="mini" disabled={busy === "bulk"} onClick={() => runBulk((id) => rpc("execute_action", { p_action: "predict_outcome", p_dispute: id, p_params: {}, p_actor: email, p_rationale: "Bulk predict" }))}>Predict</button>
+                <button className="mini" onClick={() => setSelected(new Set())}>Clear</button>
+              </div>
+            )}
+            <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 9 }}>
+              <input value={dispQuery} onChange={(e) => setDispQuery(e.target.value)} placeholder="Filter…"
+                style={{ padding: "8px 12px", border: 0, borderRadius: 9, background: "var(--sunk)", boxShadow: "inset 0 0 0 1px var(--line)", font: "inherit", fontSize: 12.5, width: 150 }} />
+              <select className="dsel" value={dispSort} onChange={(e) => setDispSort(e.target.value)} style={{ padding: "8px 10px" }}>
+                <option value="deadline">Sort: deadline</option>
+                <option value="demand">Sort: demand</option>
+                <option value="score">Sort: ineligibility</option>
+              </select>
+              <span className="muted" style={{ fontSize: 12.5 }}>{displayed.length}</span>
+              <button className="mini" onClick={() => downloadCSV("avertyn-disputes.csv", displayed, DISPUTE_CSV_COLS)}>Export CSV</button>
             </div>
           </div>
           <div className="work" style={{ flex: 1 }}>
           <div className="list">
-            <div className="lhdr"><b>{tabHeader}</b><span className="ct">{filtered.length}</span></div>
-            {filtered.length === 0
-              ? <p className="muted" style={{ padding: 16 }}>Nothing in this stage right now.</p>
-              : filtered.map((r) => {
+            <div className="lhdr"><b>{tabHeader}</b><span className="ct">{displayed.length}</span></div>
+            {displayed.length === 0
+              ? <p className="muted" style={{ padding: 16 }}>Nothing here right now.</p>
+              : displayed.map((r) => {
                   const rd = read(r);
+                  const isSel = selected.has(r.id);
                   return (
                     <div key={r.id} className={"lrow" + (r.id === sel ? " on" : "")} onClick={() => setSel(r.id)}>
-                      <div className="r1"><b>#{r.external_ref}</b><span className="badge"><i className={"dot d-" + rd.tone} />{rd.label}</span></div>
+                      <div className="r1">
+                        <label style={{ display: "flex", alignItems: "center", gap: 8 }} onClick={(e) => e.stopPropagation()}>
+                          <input type="checkbox" checked={isSel} onChange={(e) => { const n = new Set(selected); e.target.checked ? n.add(r.id) : n.delete(r.id); setSelected(n); }} />
+                          <b>#{r.external_ref}</b>
+                        </label>
+                        <span className="badge"><i className={"dot d-" + rd.tone} />{rd.label}</span>
+                      </div>
                       <div className="r2">{r.initiators?.name || "—"} · {money(r.demand_amount)} · {r.workflow_state}</div>
                     </div>
                   );
@@ -492,9 +539,34 @@ function Tile({ l, n, goal, good, bad, prog, tone }) {
 function ExposureView({ exposure }) {
   const totalRisk = exposure.reduce((a, e) => a + Number(e.at_risk || 0), 0);
   const totalDef = exposure.reduce((a, e) => a + Number(e.defended || 0), 0);
+  function printBrief() {
+    const fmt = (n) => "$" + Number(n || 0).toLocaleString("en-US", { maximumFractionDigits: 0 });
+    const rows = exposure.map((e) => `<tr><td><b>${e.employer}</b></td><td>${e.broker_name || "—"}</td><td class="n">${e.total_disputes}</td><td class="n">${e.open_disputes}</td><td class="n risk">${fmt(e.at_risk)}</td><td class="n good">${fmt(e.defended)}</td></tr>`).join("");
+    const html = `<!doctype html><html><head><meta charset="utf-8"><title>Avertyn — Employer IDR Exposure</title>
+<style>body{font-family:-apple-system,Segoe UI,Inter,sans-serif;color:#191712;margin:40px;background:#fffef9}
+.hd{display:flex;align-items:center;gap:10px;border-bottom:2px solid #191712;padding-bottom:14px}
+.lg{width:30px;height:30px;border-radius:9px;background:#191712;color:#fbf8f0;display:grid;place-items:center;font-weight:700;font-family:Georgia,serif}
+h1{font-family:Georgia,serif;font-size:26px;margin:0}.sub{color:#6b665b;font-size:13px;margin:10px 0 22px}
+.kpis{display:flex;gap:14px;margin-bottom:22px}.kpi{border:1px solid #e2ddd1;border-radius:12px;padding:14px 18px;flex:1}
+.kpi .l{font-size:11px;color:#6b665b;text-transform:uppercase;letter-spacing:.05em}.kpi .v{font-size:24px;font-weight:700;margin-top:6px}
+table{width:100%;border-collapse:collapse;font-size:13px}th{text-align:left;font-size:10px;text-transform:uppercase;letter-spacing:.06em;color:#8a857a;border-bottom:1px solid #e2ddd1;padding:9px 10px}
+td{padding:11px 10px;border-bottom:1px solid #efeade}td.n{text-align:right;font-variant-numeric:tabular-nums}.risk{color:#a8321f;font-weight:600}.good{color:#2e6b4c;font-weight:600}
+.ft{margin-top:26px;font-size:11px;color:#8a857a}</style></head>
+<body><div class="hd"><span class="lg">A</span><h1>Employer IDR Exposure</h1></div>
+<div class="sub">Prepared by Avertyn · plan-side No Surprises Act IDR defense · ${new Date().toLocaleDateString()}</div>
+<div class="kpis"><div class="kpi"><div class="l">Employers</div><div class="v">${exposure.length}</div></div>
+<div class="kpi"><div class="l">Total at risk (open)</div><div class="v" style="color:#a8321f">${fmt(totalRisk)}</div></div>
+<div class="kpi"><div class="l">Defended to date</div><div class="v" style="color:#2e6b4c">${fmt(totalDef)}</div></div></div>
+<table><thead><tr><th>Employer</th><th>Broker</th><th class="n">Disputes</th><th class="n">Open</th><th class="n">At risk</th><th class="n">Defended</th></tr></thead><tbody>${rows}</tbody></table>
+<div class="ft">Confidential · figures reflect current open IDR exposure and dollars defended to date.</div></body></html>`;
+    const w = window.open("", "_blank");
+    if (!w) return;
+    w.document.write(html); w.document.close(); w.focus(); setTimeout(() => w.print(), 350);
+  }
   return (
     <div>
-      <div className="dh"><h1>Exposure</h1><span className="sub">What IDR is costing each plan sponsor — the view your brokers distribute</span></div>
+      <div className="dh"><h1>Exposure</h1><span className="sub">What IDR is costing each plan sponsor — the view your brokers distribute</span>
+        <button className="mini" style={{ marginLeft: "auto" }} disabled={!exposure.length} onClick={printBrief}>Export broker brief →</button></div>
       <div className="cards" style={{ marginTop: 14 }}>
         <Tile l="Employers" n={exposure.length} />
         <Tile l="Total at risk (open)" n={money(totalRisk)} />
@@ -533,7 +605,8 @@ function Detail({ dd, onRun, onDoc, onOpenNeg, onAction, onStageMoney, onView, b
   return (
     <div>
       <div className="dh"><h1>#{d.external_ref}</h1>
-        <span className="sub">{d.initiators?.name} · CPT {d.cpt_code} · {d.plans?.name} · {d.workflow_state}</span></div>
+        <span className="sub">{d.initiators?.name} · CPT {d.cpt_code} · {d.plans?.name} · {d.workflow_state}</span>
+        <a className="mini" href={`/dispute/${d.id}`} style={{ marginLeft: "auto" }}>Open IDR case →</a></div>
       <div className="cards">
         <div className="box" style={{ display: "flex", gap: 16, alignItems: "center" }}>
           <div className="gauge" style={{ background: `conic-gradient(${gcol} ${s}%,#eeedea 0)` }}>

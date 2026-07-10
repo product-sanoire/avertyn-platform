@@ -35,6 +35,8 @@ export function InitiatorsView({ orgId, onErr }) {
   const wIneligible = totDisputes
     ? Math.round(rows.reduce((a, r) => a + Number(r.avg_ineligibility || 0) * Number(r.disputes || 0), 0) / totDisputes)
     : 0;
+  const chartRows = [...rows].map((r) => ({ ...r, _m: r.avg_qpa ? Number(r.avg_demand) / Number(r.avg_qpa) : 0 })).sort((a, b) => b._m - a._m).slice(0, 8);
+  const maxMult = Math.max(1, ...chartRows.map((r) => r._m));
 
   return (
     <div>
@@ -46,6 +48,24 @@ export function InitiatorsView({ orgId, onErr }) {
         <div className="kpi-tile"><div className="l">Disputes filed</div><div className="n">{totDisputes}</div></div>
         <div className="kpi-tile"><div className="l">Avg ineligibility</div><div className="n">{wIneligible}</div><div className="goal">weighted across filings</div></div>
         <div className="kpi-tile"><div className="l">Challenged</div><div className="n">{totChallenged}</div><div className="goal good">eligibility challenges filed</div></div>
+      </div>
+
+      <div className="panel">
+        <div className="ph">Demand ÷ QPA by initiator<span className="act"><span className="muted" style={{ fontSize: 11 }}>how far each filer overreaches vs. the plan's QPA</span></span></div>
+        <div className="pb" style={{ paddingTop: 14 }}>
+          {chartRows.length === 0 ? <p className="muted">No data yet.</p> : chartRows.map((r, i) => {
+            const w = Math.min(100, (r._m / maxMult) * 100);
+            return (
+              <div key={i} style={{ display: "flex", alignItems: "center", gap: 12, padding: "7px 0" }}>
+                <div style={{ width: 140, fontSize: 12.5, fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{r.initiator}</div>
+                <div style={{ flex: 1, height: 14, background: "var(--sunk)", borderRadius: 999, overflow: "hidden" }}>
+                  <div style={{ height: "100%", width: w + "%", background: "linear-gradient(90deg,#c8492e,#a8321f)", borderRadius: 999 }} />
+                </div>
+                <div className="mono" style={{ width: 54, textAlign: "right", fontWeight: 600, fontSize: 12.5 }}>{r._m.toFixed(1)}×</div>
+              </div>
+            );
+          })}
+        </div>
       </div>
 
       <div className="panel">

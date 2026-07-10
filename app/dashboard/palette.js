@@ -33,7 +33,7 @@ export function CommandPalette({ orgId, rows, tabs, onNavigate, onSelectDispute,
 
   function selectResult(r) {
     if (r.type === "dispute") { const row = (rows || []).find((x) => x.external_ref === r.ref); if (row) return onSelectDispute(row.id); }
-    if (r.type === "task") return onNavigate(Math.max(0, tabs.indexOf("Tasks")));
+    if (r.type === "task") return onNavigate(Math.max(0, tabs.indexOf("Workspace")));
     onClose();
   }
 

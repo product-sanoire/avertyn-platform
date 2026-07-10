@@ -169,46 +169,59 @@ function TaskRow({ t, onToggle }) {
 }
 
 // ---------------------------------------------------------------- Calendar
+const CAL_TONE = { deadline: "red", filing: "clay", meeting: "indigo", reminder: "sage" };
 export function CalendarView({ onErr }) {
   const [items, setItems] = useState([]);
+  const [offset, setOffset] = useState(0);
   const load = useCallback(async () => {
     const [{ data: ev, error: e1 }, { data: dl, error: e2 }] = await Promise.all([
-      supabase.from("calendar_events").select("id, title, kind, start_at, dispute_id"),
-      supabase.from("deadlines").select("id, kind, due_at, status, dispute_id"),
+      supabase.from("calendar_events").select("id, title, kind, start_at"),
+      supabase.from("deadlines").select("id, kind, due_at, status"),
     ]);
     if (e1 || e2) return onErr((e1 || e2).message);
-    const merged = [
-      ...(ev || []).map((x) => ({ id: "e" + x.id, title: x.title, kind: x.kind, at: x.start_at, dispute_id: x.dispute_id })),
-      ...(dl || []).map((x) => ({ id: "d" + x.id, title: (x.kind || "deadline").replace(/_/g, " "), kind: "deadline", at: x.due_at, dispute_id: x.dispute_id, status: x.status })),
-    ].filter((x) => x.at).sort((a, b) => new Date(a.at) - new Date(b.at));
-    setItems(merged);
+    setItems([
+      ...(ev || []).map((x) => ({ id: "e" + x.id, title: x.title, kind: x.kind, at: x.start_at })),
+      ...(dl || []).map((x) => ({ id: "d" + x.id, title: (x.kind || "deadline").replace(/_/g, " "), kind: "deadline", at: x.due_at })),
+    ].filter((x) => x.at));
   }, [onErr]);
   useEffect(() => { load(); }, [load]);
 
-  const now = Date.now();
-  const upcoming = items.filter((i) => new Date(i.at).getTime() >= now - 864e5);
-  // group by day
-  const groups = {};
-  upcoming.forEach((i) => { const k = new Date(i.at).toDateString(); (groups[k] = groups[k] || []).push(i); });
-  const kindTone = { deadline: "red", filing: "clay", meeting: "indigo", reminder: "sage" };
+  const base = new Date(); base.setDate(1); base.setMonth(base.getMonth() + offset);
+  const year = base.getFullYear(), month = base.getMonth();
+  const monthName = base.toLocaleString(undefined, { month: "long", year: "numeric" });
+  const firstDow = (new Date(year, month, 1).getDay() + 6) % 7; // Mon=0
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const byDay = {};
+  items.forEach((i) => { const d = new Date(i.at); if (d.getFullYear() === year && d.getMonth() === month) (byDay[d.getDate()] = byDay[d.getDate()] || []).push(i); });
+  const cells = []; for (let i = 0; i < firstDow; i++) cells.push(null); for (let d = 1; d <= daysInMonth; d++) cells.push(d);
+  const t = new Date(); const isToday = (d) => d && offset === 0 && t.getFullYear() === year && t.getMonth() === month && t.getDate() === d;
+
   return (
     <div>
-      <div className="dh"><h1>Calendar &amp; deadlines</h1><span className="sub">{upcoming.length} upcoming · business-day, holiday-aware windows</span></div>
-      {upcoming.length === 0 ? <div className="empty"><div className="eh">Nothing upcoming</div><div className="es">Deadlines and events will appear here as disputes move through the workflow.</div></div> : (
-        <div className="panel"><div className="pb" style={{ paddingTop: 10 }}>
-          {Object.entries(groups).map(([day, list]) => (
-            <div key={day} style={{ margin: "6px 0 12px" }}>
-              <div className="rlabel" style={{ margin: "8px 0" }}>{day}</div>
-              {list.map((i) => (
-                <div key={i.id} className="frow" style={{ alignItems: "center" }}>
-                  <span className={"badge b-" + (kindTone[i.kind] || "grey")}>{i.kind}</span>
-                  <div style={{ flex: 1 }}><b>{i.title}</b><div className="sub">{fmtDateTime(i.at)}{i.status ? " · " + i.status : ""}</div></div>
-                </div>
+      <div className="dh"><h1>Calendar</h1><span className="sub">Business-day, holiday-aware windows</span>
+        <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 8 }}>
+          <button className="mini" onClick={() => setOffset(offset - 1)}>‹</button>
+          <b style={{ fontFamily: "var(--disp)", fontSize: 17, minWidth: 158, textAlign: "center" }}>{monthName}</b>
+          <button className="mini" onClick={() => setOffset(offset + 1)}>›</button>
+          {offset !== 0 && <button className="mini" onClick={() => setOffset(0)}>Today</button>}
+        </div>
+      </div>
+      <div className="panel" style={{ marginTop: 16 }}>
+        <div className="calgrid calhead">
+          {["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map((d) => <div key={d} className="calh">{d}</div>)}
+        </div>
+        <div className="calgrid">
+          {cells.map((d, i) => (
+            <div key={i} className={"calcell" + (d ? "" : " empty") + (isToday(d) ? " today" : "")}>
+              {d && <div className="caln">{d}</div>}
+              {d && (byDay[d] || []).slice(0, 3).map((ev, j) => (
+                <div key={j} className={"calev b-" + (CAL_TONE[ev.kind] || "grey")} title={ev.title + " · " + fmtDateTime(ev.at)}>{ev.title}</div>
               ))}
+              {d && (byDay[d] || []).length > 3 && <div className="calmore">+{(byDay[d] || []).length - 3} more</div>}
             </div>
           ))}
-        </div></div>
-      )}
+        </div>
+      </div>
     </div>
   );
 }
