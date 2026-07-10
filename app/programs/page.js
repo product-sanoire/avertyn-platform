@@ -93,6 +93,8 @@ export default function ProgramsPage() {
           <ModuleCard t={MODULES.erisa_fiduciary} rows={[["Plans", kpi("erisa_fiduciary").plans_assessed || 0], ["Compliance", pct(kpi("erisa_fiduciary").avg_score)], ["Open gaps", kpi("erisa_fiduciary").open_gaps || 0]]} />
         </div>
 
+        <EditsImporter cov={cov} onDone={loadDash} />
+
         {/* ---- Bill-review case queue ---- */}
         <div className="panel" style={{ marginTop: 18 }}>
           <div className="ph">Bill review
@@ -193,12 +195,89 @@ function CaseDetail({ sel }) {
         <div key={a.id} style={{ padding: "6px 0", borderBottom: "1px solid var(--hair,#eee)" }}>
           <div style={{ display: "flex", justifyContent: "space-between", gap: 8, flexWrap: "wrap" }}>
             <span><span className={"badge b-" + (SEV_TONE[a.severity] || "grey")}><i className={"dot d-" + (SEV_TONE[a.severity] || "grey")} />{a.rule_code}</span>
-              <span style={{ marginLeft: 8, fontSize: 12.5 }}>{a.description}</span></div>
+              <span style={{ marginLeft: 8, fontSize: 12.5 }}>{a.description}</span></span>
             <b style={{ fontFamily: "var(--num,monospace)", whiteSpace: "nowrap" }}>−{money(a.amount)}</b>
           </div>
           {a.authority && <div className="muted" style={{ fontSize: 11, marginTop: 2 }}>{a.authority}{a.confidence != null ? ` · confidence ${Math.round(a.confidence * 100)}%` : ""}</div>}
         </div>
       ))}
+    </div>
+  );
+}
+
+// Upload a CMS NCCI PTP / MUE quarterly CSV straight to the ingest-cms-edits
+// edge function. supabase.functions.invoke attaches the signed-in user's JWT,
+// so this only succeeds for an admin (the RPC enforces _require_admin).
+function EditsImporter({ cov, onDone }) {
+  const [open, setOpen] = useState(false);
+  const [kind, setKind] = useState("ncci");
+  const [quarter, setQuarter] = useState((cov && cov.ncci_quarters && cov.ncci_quarters[0]) || "2026Q3");
+  const [svc, setSvc] = useState("practitioner");
+  const [file, setFile] = useState(null);
+  const [busy, setBusy] = useState(false);
+  const [res, setRes] = useState(null);
+  const [err, setErr] = useState("");
+
+  async function run() {
+    setErr(""); setRes(null);
+    if (!file) { setErr("Choose a CSV file first."); return; }
+    if (!quarter.trim()) { setErr("Enter a quarter, e.g. 2026Q3."); return; }
+    setBusy(true);
+    try {
+      const csv = await file.text();
+      const body = { kind, quarter: quarter.trim(), csv, source_url: `upload:${file.name}` };
+      if (kind === "mue") body.service_type = svc;
+      const { data, error } = await supabase.functions.invoke("ingest-cms-edits", { body });
+      if (error) throw error;
+      setRes(data);
+      if (data && data.ok === false && Array.isArray(data.errors)) setErr(data.errors.join(" · "));
+      if (onDone) await onDone();
+    } catch (e) {
+      setErr((e && e.message) || String(e) + " — you must be signed in as an admin to load edits.");
+    }
+    setBusy(false);
+  }
+
+  return (
+    <div className="panel" style={{ marginTop: 12 }}>
+      <div className="ph">Reference data
+        <span className="act" style={{ display: "flex", gap: 10, alignItems: "center" }}>
+          <span className="muted" style={{ fontSize: 12 }}>
+            {cov ? `${cov.ncci_pairs} NCCI · ${cov.mue_codes} MUE · ${cov.drg_rows} DRG${(cov.ncci_quarters && cov.ncci_quarters.length) ? " · " + cov.ncci_quarters.join("/") : ""}` : "…"}
+          </span>
+          <button className="btn btn-s" onClick={() => setOpen((v) => !v)}>{open ? "Close" : "Import CMS edits"}</button>
+        </span>
+      </div>
+      {open && (
+        <div className="pb" style={{ paddingTop: 10 }}>
+          <div className="muted" style={{ fontSize: 12, marginBottom: 8 }}>
+            Upload a CMS NCCI PTP or MUE quarterly file as CSV (unzip the CMS download and export the sheet to CSV first).
+            Columns are auto-detected; upserts are idempotent per quarter. Admin only.
+          </div>
+          <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
+            <select className="btn btn-s" value={kind} onChange={(e) => setKind(e.target.value)}>
+              <option value="ncci">NCCI PTP edits</option>
+              <option value="mue">MUE values</option>
+            </select>
+            <input className="btn btn-s" style={{ width: 110 }} value={quarter} onChange={(e) => setQuarter(e.target.value)} placeholder="2026Q3" />
+            {kind === "mue" && (
+              <select className="btn btn-s" value={svc} onChange={(e) => setSvc(e.target.value)}>
+                <option value="practitioner">Practitioner</option>
+                <option value="hospital">Hospital / outpatient</option>
+                <option value="dme">DME / supplier</option>
+              </select>
+            )}
+            <input type="file" accept=".csv,text/csv" onChange={(e) => setFile(e.target.files && e.target.files[0])} style={{ fontSize: 12 }} />
+            <button className="btn btn-a" disabled={busy} onClick={run}>{busy ? "Loading…" : "Load"}</button>
+          </div>
+          {err && <div className="badge b-red" style={{ marginTop: 10, display: "inline-flex", gap: 8 }}><i className="dot d-red" />{err}</div>}
+          {res && !err && (
+            <div className="badge b-green" style={{ marginTop: 10, display: "inline-flex", gap: 8 }}>
+              <i className="dot d-green" />Loaded {res.upserted} of {res.total_rows} rows ({res.batches} batch{res.batches === 1 ? "" : "es"}) into {res.kind.toUpperCase()} · {res.quarter}
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }

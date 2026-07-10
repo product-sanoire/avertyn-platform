@@ -42,11 +42,20 @@ const KIND_LABEL = {
   ct_payment_standard_defense: "CT payment-standard defense",
   wa_arbitration_position: "WA arbitration position",
   il_balance_bill_position: "IL balance-billing position",
+  ga_arbitration_position: "GA arbitration position",
+  co_arbitration_position: "CO OON position",
+  va_arbitration_position: "VA arbitration position",
+  fl_claim_dispute_position: "FL claim-dispute position",
   // QPA methodology & audit defense
   qpa_methodology_defense: "QPA methodology substantiation",
   qpa_audit_response: "QPA audit response",
   // Air-ambulance IDR
   air_ambulance_position: "Air-ambulance IDR position",
+  // Reference-based pricing / payment integrity
+  rbp_substantiation: "RBP substantiation",
+  oon_repricing_notice: "OON repricing & offer",
+  payment_integrity_determination: "Payment-integrity determination",
+  bill_review_determination: "Bill-review determination (WC / Auto)",
 };
 
 // Jurisdiction grouping labels for the template picker (falls back to the raw code).
@@ -59,6 +68,11 @@ const JURISDICTION_LABEL = {
   CT: "Connecticut",
   WA: "Washington",
   IL: "Illinois",
+  GA: "Georgia",
+  CO: "Colorado",
+  VA: "Virginia",
+  FL: "Florida",
+  WC_AUTO: "Workers' comp / Auto",
 };
 
 // Brief lifecycle: draft -> in review -> approved -> filed (separate from the tamper-evident seal).
