@@ -25,6 +25,7 @@ export default function Negotiation({ dispute, onChanged }) {
 
   const [rates, setRates] = useState([]);
   const [offers, setOffers] = useState([]);
+  const [qpaRec, setQpaRec] = useState(null);   // qpa_records: FAIR Health median, defensible ceiling
   const [err, setErr] = useState("");
   const [busy, setBusy] = useState("");
   const [calc, setCalc] = useState(null);
@@ -34,14 +35,24 @@ export default function Negotiation({ dispute, onChanged }) {
   const load = useCallback(async () => {
     if (!disputeId) return;
     try {
-      const [{ data: r, error: e1 }, { data: o, error: e2 }] = await Promise.all([
+      const [{ data: r, error: e1 }, { data: o, error: e2 }, { data: qr }] = await Promise.all([
         supabase.rpc("list_qpa_rates", { p_dispute: disputeId }),
         supabase.from("offers").select("id, party, kind, amount, pct_of_qpa, round_no, status, note, submitted_at").eq("dispute_id", disputeId).order("round_no", { ascending: true }),
+        supabase.from("qpa_records").select("benchmark_fairhealth, defensible_ceiling").eq("dispute_id", disputeId).maybeSingle(),
       ]);
       if (e1) throw e1; if (e2) throw e2;
-      setRates(r || []); setOffers(o || []);
+      setRates(r || []); setOffers(o || []); setQpaRec(qr || null);
     } catch (e) { setErr(e.message || String(e)); }
   }, [disputeId]);
+
+  // Independent benchmark each offer is measured against: FAIR Health median,
+  // falling back to the defensible ceiling.
+  const bench = (() => {
+    const fh = Number(qpaRec?.benchmark_fairhealth || 0);
+    if (fh > 0) return { v: fh, label: "FAIR Health median", short: "FAIR Health" };
+    const dc = Number(qpaRec?.defensible_ceiling || 0) || ceiling;
+    return dc > 0 ? { v: dc, label: "defensible ceiling", short: "ceiling" } : null;
+  })();
   useEffect(() => { load(); }, [load]);
 
   // ---- QPA calculator ------------------------------------------------------
@@ -199,6 +210,11 @@ export default function Negotiation({ dispute, onChanged }) {
               <b className="mono" style={{ minWidth: 92 }}>{money(o.amount)}</b>
               <span className="muted mono" style={{ minWidth: 70, fontSize: 12 }}>{o.pct_of_qpa != null ? o.pct_of_qpa + "% QPA" : "—"}</span>
               <span className="muted" style={{ flex: 1, fontSize: 12 }}>{[(o.kind || "").replace(/_/g, " "), o.note].filter(Boolean).join(" · ")}</span>
+              {bench && (() => { const bp = Math.round(Number(o.amount) / bench.v * 100); const over = Number(o.amount) > bench.v; return (
+                <span className={"badge b-" + (over ? "red" : "green")} title={`${o.party === "plan" ? "Plan" : "Provider"} offer vs ${bench.label} (${money(bench.v)})`}>
+                  <i className={"dot d-" + (over ? "red" : "green")} />{bp}% of {bench.short} · {over ? "above" : "at/below"}
+                </span>
+              ); })()}
               <span className={"badge b-" + (STATUS_TONE[o.status] || "grey")}><i className={"dot d-" + (STATUS_TONE[o.status] || "grey")} />{STATUS_LABEL[o.status] || o.status}</span>
               {o.status !== "accepted" && <button className="mini" disabled={busy === "st:" + o.id} onClick={() => setStatus(o.id, "accepted")} title="Mark accepted">✓</button>}
               {o.status !== "rejected" && <button className="mini" disabled={busy === "st:" + o.id} onClick={() => setStatus(o.id, "rejected")} title="Mark rejected">✕ rej</button>}
