@@ -1,0 +1,4 @@
+-- Completes the agent action catalog: predict_outcome, generate_document,
+-- notify, idr_sync_in wired as governed, ledgered typed actions in
+-- execute_action; action_perm + autonomy_settings seeded. (Applied via MCP
+-- migration 'agent_catalog_completion'; full body there.)

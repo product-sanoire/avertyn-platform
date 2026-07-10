@@ -6,6 +6,7 @@ import { money } from "../../lib/format";
 import { InboxView, TasksView, CalendarView, PredictionsView } from "./ops";
 import { InitiatorsView, DeadlinesView, IntegrationsView } from "./tiera";
 import { ImportHub } from "./import";
+import { CommandPalette } from "./palette";
 
 const TABS = ["Overview", "Disputes", "Deadlines", "Initiators", "Exposure", "Predictions", "Inbox", "Tasks", "Calendar", "Integrations"];
 const STAGES = [["all", "All"], ["incoming", "Incoming"], ["eligibility", "Eligibility"], ["qpa", "QPA defense"], ["respond", "Respond & pay"]];
@@ -43,6 +44,7 @@ export default function Dashboard() {
   const [notifList, setNotifList] = useState([]);
   const [notifOpen, setNotifOpen] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
+  const [paletteOpen, setPaletteOpen] = useState(false);
   const [docView, setDocView] = useState(null);
   const [moneyRel, setMoneyRel] = useState(null);
   const [tab, setTab] = useState(0);
@@ -124,6 +126,11 @@ export default function Dashboard() {
   }, []);
 
   useEffect(() => { loadShell(); }, [loadShell]);
+  useEffect(() => {
+    const h = (e) => { if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") { e.preventDefault(); setPaletteOpen((o) => !o); } };
+    window.addEventListener("keydown", h);
+    return () => window.removeEventListener("keydown", h);
+  }, []);
   useEffect(() => { if (rows.length && !sel) setSel(rows[0].id); }, [rows, sel]);
   useEffect(() => { if (sel) loadDetail(sel); }, [sel, loadDetail]);
 
@@ -219,7 +226,7 @@ export default function Dashboard() {
         <div className="brand"><span className="lg">A</span> Avertyn</div>
         <div className="switch">Meridian Plan Administrators ⌄</div>
         <div className="grow" />
-        <div className="search" title="Search coming soon"><span>Search…</span><span className="kbd">⌘K</span></div>
+        <div className="search" title="Search & commands" style={{ cursor: "pointer" }} onClick={() => setPaletteOpen(true)}><span>Search…</span><span className="kbd">⌘K</span></div>
         <button className="btn btn-s" style={{ padding: "7px 13px" }} onClick={() => setImportOpen(true)}>+ Import</button>
         <span className="live" title="Realtime — updates as disputes, awards and alerts move"><span className="pulse" />Live</span>
         <button className="bell" title="Notifications" onClick={() => setNotifOpen(true)}>
@@ -354,6 +361,12 @@ export default function Dashboard() {
 
       {notifOpen && <NotifDrawer list={notifList} onClose={() => setNotifOpen(false)} onOpen={openNotif} onAllRead={markAllRead} />}
       {importOpen && <ImportHub orgId={orgId} onErr={setErr} onClose={() => setImportOpen(false)} onDone={loadShell} />}
+      {paletteOpen && <CommandPalette orgId={orgId} rows={rows} tabs={TABS}
+        onNavigate={(i) => { setTab(i); setPaletteOpen(false); }}
+        onSelectDispute={(id) => { setSel(id); setTab(1); setStage("all"); setPaletteOpen(false); }}
+        onImport={() => { setImportOpen(true); setPaletteOpen(false); }}
+        onAutopilot={() => { runAutopilot(); setPaletteOpen(false); }}
+        onClose={() => setPaletteOpen(false)} />}
       {docView && <DocModal doc={docView} onClose={() => setDocView(null)} />}
       {moneyRel && <MoneyReleaseModal q={moneyRel} onClose={() => setMoneyRel(null)} onRelease={(amt) => { releaseMoney(moneyRel.id, amt); setMoneyRel(null); }} />}
       {err && <div className="toast"><span className="td" />{err}<button onClick={() => { setErr(""); loadShell(); }}>Retry</button><button onClick={() => setErr("")}>Dismiss</button></div>}
@@ -592,6 +605,12 @@ function Detail({ dd, onRun, onDoc, onOpenNeg, onAction, onStageMoney, onView, b
         </button>
         <button className="btn btn-s" disabled={closed || busy === "ca_withdraw"} onClick={() => onAction("withdraw", "Operator withdrew the dispute.")}>
           {busy === "ca_withdraw" ? "Withdrawing…" : "Withdraw"}
+        </button>
+        <button className="btn btn-s" disabled={busy === "ca_predict_outcome"} onClick={() => onAction("predict_outcome", "Consult the win-probability & optimal-offer model.")}>
+          {busy === "ca_predict_outcome" ? "Scoring…" : "Predict outcome"}
+        </button>
+        <button className="btn btn-s" disabled={busy === "ca_generate_document"} onClick={() => onAction("generate_document", "Draft the position statement.")}>
+          {busy === "ca_generate_document" ? "Drafting…" : "Position statement"}
         </button>
       </div>
 
