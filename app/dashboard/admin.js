@@ -13,7 +13,7 @@ const METRICS = [["count", "Dispute count"], ["defended", "Dollars defended"], [
 const DIMS = [["initiator", "Initiator"], ["plan", "Plan"], ["state", "Workflow state"], ["cpt", "CPT"], ["month", "Month"]];
 const CADENCE = ["hourly", "daily", "weekly", "monthly"];
 const SCIM_BASE = (process.env.NEXT_PUBLIC_SUPABASE_URL || "https://ssjougrsaecdwfuxeasd.supabase.co") + "/functions/v1/scim";
-const ADMIN = [["access", "Access"], ["reports", "Reports"], ["alerts", "Alerts"], ["integrations", "Integrations"]];
+const ADMIN = [["access", "Access"], ["reports", "Reports"], ["alerts", "Alerts"], ["qpa", "QPA index"], ["integrations", "Integrations"]];
 
 async function sha256Hex(s) {
   const b = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(s));
@@ -41,6 +41,7 @@ export function AdminView({ orgId, onErr }) {
       {seg === "access" ? <AccessView orgId={orgId} onErr={onErr} />
         : seg === "reports" ? <ReportsView orgId={orgId} onErr={onErr} />
         : seg === "alerts" ? <DeadlinesView orgId={orgId} onErr={onErr} embedded />
+        : seg === "qpa" ? <QpaIndexView onErr={onErr} />
         : <IntegrationsView onErr={onErr} embedded />}
     </div>
   );
@@ -224,6 +225,112 @@ function AccessView({ orgId, onErr }) {
 
 function Field({ l, wide, children }) {
   return <label className={"afield" + (wide ? " wide" : "")}><span className="rlabel" style={{ margin: "0 0 4px" }}>{l}</span>{children}</label>;
+}
+
+// ============================================================ QPA index (CPI-U)
+// The QPA calculator trends the median contracted rate forward from the 2019 base
+// year by the CPI-U index. Published BLS annual averages are seeded; estimates for
+// years BLS hasn't finalized are editable here so the calc stays current without a
+// code change.
+const CPI_BASE_YEAR = 2019;
+function QpaIndexView({ onErr }) {
+  const [rows, setRows] = useState([]);
+  const [edits, setEdits] = useState({});   // year -> { index_value?, estimated? }
+  const [busy, setBusy] = useState("");
+  const [nu, setNu] = useState({ year: "", index_value: "", estimated: true });
+
+  const load = useCallback(async () => {
+    try { const { data, error } = await supabase.rpc("list_cpi_u"); if (error) throw error; setRows(data || []); setEdits({}); }
+    catch (e) { onErr(e.message); }
+  }, [onErr]);
+  useEffect(() => { load(); }, [load]);
+
+  const base = Number(rows.find((r) => r.year === CPI_BASE_YEAR)?.index_value || 0);
+  const setEdit = (year, k, v) => setEdits((e) => ({ ...e, [year]: { ...(e[year] || {}), [k]: v } }));
+  const valOf = (r) => (edits[r.year]?.index_value !== undefined ? edits[r.year].index_value : r.index_value);
+  const estOf = (r) => (edits[r.year]?.estimated !== undefined ? edits[r.year].estimated : r.estimated);
+  const dirty = (r) => edits[r.year] && (Number(valOf(r)) !== Number(r.index_value) || !!estOf(r) !== !!r.estimated);
+
+  async function save(year) {
+    const r = rows.find((x) => x.year === year);
+    setBusy("s" + year);
+    try {
+      const { error } = await supabase.rpc("set_cpi_u", { p_year: year, p_index: Number(valOf(r)), p_estimated: !!estOf(r) });
+      if (error) throw error; await load();
+    } catch (e) { onErr(e.message); }
+    setBusy("");
+  }
+  async function addYear() {
+    if (!nu.year || !nu.index_value) return;
+    setBusy("add");
+    try {
+      const { error } = await supabase.rpc("set_cpi_u", { p_year: Number(nu.year), p_index: Number(nu.index_value), p_estimated: !!nu.estimated });
+      if (error) throw error; setNu({ year: "", index_value: "", estimated: true }); await load();
+    } catch (e) { onErr(e.message); }
+    setBusy("");
+  }
+  async function remove(year) {
+    if (year === CPI_BASE_YEAR) { onErr(`${CPI_BASE_YEAR} is the base year and can't be removed.`); return; }
+    try { const { error } = await supabase.rpc("remove_cpi_u", { p_year: year }); if (error) throw error; await load(); }
+    catch (e) { onErr(e.message); }
+  }
+
+  return (
+    <div>
+      <div className="panel">
+        <div className="ph">CPI-U index &amp; trend factors
+          <span className="act"><span className="muted" style={{ fontSize: 11 }}>base year {CPI_BASE_YEAR} · trend factor = index ÷ {CPI_BASE_YEAR} index</span></span>
+        </div>
+        <div className="pb" style={{ paddingTop: 12 }}>
+          <p className="muted" style={{ fontSize: 12, margin: "0 0 12px" }}>
+            The QPA calculator multiplies the median 2019 contracted rate by these factors to trend it to a claim&apos;s service year
+            (45 CFR 149.140). Values marked <b>estimated</b> are placeholders for years BLS hasn&apos;t published — replace them with the
+            official annual average when it&apos;s released.
+          </p>
+          {rows.length === 0 ? <p className="muted">Loading…</p> : (
+            <table>
+              <thead><tr><th>Year</th><th>CPI-U index</th><th>Trend × vs {CPI_BASE_YEAR}</th><th>Estimated</th><th></th></tr></thead>
+              <tbody>
+                {rows.map((r) => {
+                  const factor = base ? (Number(valOf(r)) / base) : null;
+                  const isBase = r.year === CPI_BASE_YEAR;
+                  return (
+                    <tr key={r.year}>
+                      <td><b>{r.year}</b>{isBase && <span className="badge b-ink" style={{ marginLeft: 8 }}>base</span>}</td>
+                      <td>
+                        <input type="number" step="0.001" value={valOf(r)} onChange={(e) => setEdit(r.year, "index_value", e.target.value)}
+                          style={{ width: 110, padding: "6px 9px", border: "1px solid var(--line)", borderRadius: 8, font: "inherit", fontSize: 12.5 }} />
+                      </td>
+                      <td className="mono" style={{ fontSize: 12.5 }}>{factor != null ? "×" + factor.toFixed(5) : "—"}</td>
+                      <td>
+                        <label style={{ display: "inline-flex", gap: 6, alignItems: "center", fontSize: 12, color: "var(--mut)" }}>
+                          <input type="checkbox" checked={!!estOf(r)} onChange={(e) => setEdit(r.year, "estimated", e.target.checked)} />
+                          {estOf(r) ? <span className="badge b-amber">estimated</span> : <span className="badge b-green">published</span>}
+                        </label>
+                      </td>
+                      <td style={{ display: "flex", gap: 6 }}>
+                        <button className="mini" disabled={!dirty(r) || busy === "s" + r.year} onClick={() => save(r.year)}>{busy === "s" + r.year ? "Saving…" : "Save"}</button>
+                        {!isBase && <button className="mini" onClick={() => remove(r.year)}>Remove</button>}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          )}
+          <div style={{ display: "flex", gap: 8, alignItems: "center", marginTop: 14, flexWrap: "wrap" }}>
+            <span className="rlabel" style={{ margin: 0 }}>Add a year</span>
+            <input type="number" placeholder="Year" value={nu.year} onChange={(e) => setNu({ ...nu, year: e.target.value })} style={{ width: 90, padding: "7px 10px", border: "1px solid var(--line)", borderRadius: 8, font: "inherit", fontSize: 12.5 }} />
+            <input type="number" step="0.001" placeholder="CPI-U index" value={nu.index_value} onChange={(e) => setNu({ ...nu, index_value: e.target.value })} style={{ width: 120, padding: "7px 10px", border: "1px solid var(--line)", borderRadius: 8, font: "inherit", fontSize: 12.5 }} />
+            <label style={{ display: "inline-flex", gap: 6, alignItems: "center", fontSize: 12, color: "var(--mut)" }}>
+              <input type="checkbox" checked={nu.estimated} onChange={(e) => setNu({ ...nu, estimated: e.target.checked })} />estimated
+            </label>
+            <button className="btn btn-a" style={{ padding: "7px 12px" }} disabled={busy === "add" || !nu.year || !nu.index_value} onClick={addYear}>{busy === "add" ? "Adding…" : "Add year"}</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
 }
 
 // ============================================================ Reports
