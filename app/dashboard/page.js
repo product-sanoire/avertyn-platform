@@ -87,6 +87,7 @@ export default function Dashboard() {
   const [intel, setIntel] = useState("initiators");
   const [dispSort, setDispSort] = useState("deadline");
   const [dispQuery, setDispQuery] = useState("");
+  const [briefFilter, setBriefFilter] = useState("all");   // all | draft | in_review | approved | filed | sealed | none
   const [selected, setSelected] = useState(() => new Set());
   const [ws, setWs] = useState("inbox");
   const [busy, setBusy] = useState("");
@@ -311,10 +312,24 @@ export default function Dashboard() {
     let arr = filtered;
     const q = dispQuery.trim().toLowerCase();
     if (q) arr = arr.filter((r) => (r.external_ref || "").toLowerCase().includes(q) || (r.initiators?.name || "").toLowerCase().includes(q) || (r.cpt_code || "").toLowerCase().includes(q));
+    if (briefFilter !== "all") {
+      arr = arr.filter((r) => {
+        const b = briefMap[r.id];
+        if (briefFilter === "none") return !b;
+        if (briefFilter === "sealed") return !!b?.sealed;
+        return b?.status === briefFilter;
+      });
+    }
+    const byDeadline = (a, b) => new Date(a.respond_by || "2999-01-01").getTime() - new Date(b.respond_by || "2999-01-01").getTime();
     return [...arr].sort((a, b) => {
       if (dispSort === "demand") return (b.demand_amount || 0) - (a.demand_amount || 0);
       if (dispSort === "score") return (b.eligibility_score || 0) - (a.eligibility_score || 0);
-      return new Date(a.respond_by || "2999-01-01").getTime() - new Date(b.respond_by || "2999-01-01").getTime();
+      if (dispSort === "brief") {
+        const ra = briefMap[a.id]?.rank || 0, rb = briefMap[b.id]?.rank || 0;
+        if (rb !== ra) return rb - ra;               // furthest-along briefs first
+        return byDeadline(a, b);
+      }
+      return byDeadline(a, b);
     });
   })();
 
@@ -424,11 +439,25 @@ export default function Dashboard() {
             <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 9 }}>
               <input value={dispQuery} onChange={(e) => setDispQuery(e.target.value)} placeholder="Filter…"
                 style={{ padding: "8px 12px", border: 0, borderRadius: 9, background: "var(--sunk)", boxShadow: "inset 0 0 0 1px var(--line)", font: "inherit", fontSize: 12.5, width: 150 }} />
+              <select className="dsel" value={briefFilter} onChange={(e) => setBriefFilter(e.target.value)} style={{ padding: "8px 10px" }}
+                title="Filter cases by their furthest-along brief status">
+                <option value="all">Brief: all</option>
+                <option value="draft">Brief: draft</option>
+                <option value="in_review">Brief: in review</option>
+                <option value="approved">Brief: approved</option>
+                <option value="filed">Brief: filed</option>
+                <option value="sealed">Brief: sealed</option>
+                <option value="none">Brief: none yet</option>
+              </select>
               <select className="dsel" value={dispSort} onChange={(e) => setDispSort(e.target.value)} style={{ padding: "8px 10px" }}>
                 <option value="deadline">Sort: deadline</option>
                 <option value="demand">Sort: demand</option>
                 <option value="score">Sort: ineligibility</option>
+                <option value="brief">Sort: brief status</option>
               </select>
+              {briefFilter !== "all" && (
+                <button className="mini" onClick={() => setBriefFilter("all")} title="Clear brief-status filter">✕ brief</button>
+              )}
               <span className="muted" style={{ fontSize: 12.5 }}>{displayed.length}</span>
               <button className="mini" onClick={() => downloadCSV("avertyn-disputes.csv", displayed, DISPUTE_CSV_COLS)}>Export CSV</button>
             </div>
