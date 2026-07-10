@@ -271,6 +271,8 @@ export function WorkspaceHub({ email, orgId, userId, onErr }) {
 /* ============================ Today cockpit ============================ */
 const CAP = 8;
 function Cockpit({ groups, sel, setSel, labelOf, caseOf, selected, focusMsgs, reply, setReply, sendReply, markTaskDone, resolveDeadline, busy, radar, teamLoad }) {
+  const [leftOpen, setLeftOpen] = useState(true);
+  const [rightOpen, setRightOpen] = useState(true);
   const total = groups.over.length + groups.soon.length + groups.week.length;
   const icon = (t) => t === "message" ? "✉" : t === "task" ? "✓" : "▲";
   const Row = (it) => {
@@ -294,9 +296,10 @@ function Cockpit({ groups, sel, setSel, labelOf, caseOf, selected, focusMsgs, re
     );
   };
   return (
-    <div className="ws-cockpit">
+    <div className="ws-cockpit" style={{ gridTemplateColumns: `${leftOpen ? "1.05fr" : "42px"} minmax(0,1.6fr) ${rightOpen ? "258px" : "42px"}` }}>
+      {leftOpen ? (
       <div className="ws-col">
-        <div className="ws-colhd"><h3>Needs you now</h3><span className="ct">{total}</span></div>
+        <div className="ws-colhd"><h3>Needs you now</h3><span className="ct">{total}</span><button className="ws-collapse" title="Collapse queue" onClick={() => setLeftOpen(false)}>«</button></div>
         <div className="ws-scroll">
           {groups.over.length > 0 && <div className="ws-qgroup"><div className="glabel red"><i className="dot d-red" />Overdue · {groups.over.length}</div>{groups.over.slice(0, CAP).map(Row)}{groups.over.length > CAP && <div className="ws-morerow">+{groups.over.length - CAP} more overdue</div>}</div>}
           {groups.soon.length > 0 && <div className="ws-qgroup"><div className="glabel amber"><i className="dot d-amber" />Today &amp; next 72h</div>{groups.soon.slice(0, CAP).map(Row)}{groups.soon.length > CAP && <div className="ws-morerow">+{groups.soon.length - CAP} more</div>}</div>}
@@ -304,6 +307,9 @@ function Cockpit({ groups, sel, setSel, labelOf, caseOf, selected, focusMsgs, re
           {total === 0 && <p className="muted" style={{ padding: 18 }}>Nothing needs you right now. 🎉</p>}
         </div>
       </div>
+      ) : (
+        <button className="ws-slim" title="Show queue" onClick={() => setLeftOpen(true)}><span className="chev">»</span><span className="lbl">Queue</span>{total > 0 && <span className="ws-slim-n">{total}</span>}</button>
+      )}
 
       <div className="ws-col">
         <div className="ws-read">
@@ -311,8 +317,9 @@ function Cockpit({ groups, sel, setSel, labelOf, caseOf, selected, focusMsgs, re
         </div>
       </div>
 
+      {rightOpen ? (
       <div className="ws-rail">
-        <h3>Deadline radar · 7 days</h3>
+        <div className="ws-railhd"><h3>Deadline radar · 7 days</h3><button className="ws-collapse" title="Collapse panel" onClick={() => setRightOpen(false)}>»</button></div>
         <div className="ws-radar">
           {radar.length === 0 ? <p className="muted" style={{ fontSize: 12 }}>Nothing in the next week.</p> : radar.map((it) => {
             const ci = labelOf(it.caseId); const cd = countdown(it.at, it.type);
@@ -331,6 +338,9 @@ function Cockpit({ groups, sel, setSel, labelOf, caseOf, selected, focusMsgs, re
           return (<div key={u.key} className="ws-teamrow"><span className={"ws-av " + avColor(u.key)}>{initials(u.name)}</span><div className="nm">{u.name}</div><div className="cap"><div className="load">{u.count} open</div><div className="capbar"><i style={{ width: pct + "%", background: col }} /></div></div></div>);
         })}
       </div>
+      ) : (
+        <button className="ws-slim right" title="Show radar & team load" onClick={() => setRightOpen(true)}><span className="chev">«</span><span className="lbl">Radar</span></button>
+      )}
     </div>
   );
 }

@@ -535,10 +535,22 @@ input,select,textarea{color:var(--ink);font-family:inherit}
 .ws-cchip{font-family:var(--num);font-size:10.5px;font-weight:600;color:var(--ink-2);background:var(--card);border:1px solid var(--line);padding:1px 6px;border-radius:6px;white-space:nowrap}
 
 /* cockpit */
-.ws-cockpit{display:grid;grid-template-columns:1.15fr 1.5fr 258px;flex:1;min-height:0;border-top:1px solid var(--line)}
-.ws-col{border-right:1px solid var(--line);display:flex;flex-direction:column;min-width:0;min-height:0}.ws-col:last-child{border-right:0}
+/* Whole page scrolls; columns take natural height (align-items:start) so short
+   columns don't stretch into a white gap next to the long queue. */
+.ws-cockpit{display:grid;grid-template-columns:1.15fr 1.5fr 258px;align-items:start;border-top:1px solid var(--line)}
+.ws-col{border-right:1px solid var(--line);display:flex;flex-direction:column;min-width:0}.ws-col:last-child{border-right:0}
+/* collapse controls + slim rails */
+.ws-collapse{margin-left:4px;border:0;background:none;cursor:pointer;color:var(--faint);font-size:15px;line-height:1;padding:2px 6px;border-radius:6px}
+.ws-collapse:hover{background:var(--sunk);color:var(--ink)}
+.ws-railhd{display:flex;align-items:center;gap:8px;justify-content:space-between;margin-bottom:8px}.ws-railhd h3{margin-bottom:0}
+.ws-slim{align-self:stretch;border:0;border-right:1px solid var(--line);background:var(--card-2);cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:8px;padding:12px 0;min-height:180px}
+.ws-slim.right{border-right:0;border-left:1px solid var(--line)}
+.ws-slim:hover{background:var(--sunk)}
+.ws-slim .chev{font-size:15px;color:var(--mut)}
+.ws-slim .lbl{writing-mode:vertical-rl;transform:rotate(180deg);font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--mut)}
+.ws-slim .ws-slim-n{font-family:var(--num);font-size:11px;font-weight:600;color:#fff;background:var(--sig);border-radius:999px;padding:1px 6px;margin-top:auto}
 .ws-colhd{display:flex;align-items:center;gap:8px;padding:13px 16px 6px}.ws-colhd h3{font-family:var(--disp);font-size:15px;font-weight:500}.ws-colhd .ct{margin-left:auto;font-family:var(--num);font-size:11px;color:var(--faint)}
-.ws-scroll{overflow:auto;flex:1}
+.ws-scroll{overflow:visible}
 .ws-qgroup{padding:2px 10px 6px}
 .ws-qgroup .glabel{font-size:10.5px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;padding:8px 8px 5px;display:flex;align-items:center;gap:7px;color:var(--faint)}
 .ws-qgroup .glabel.red{color:var(--sig-ink)}.ws-qgroup .glabel.amber{color:var(--warn)}
@@ -550,7 +562,7 @@ input,select,textarea{color:var(--ink);font-family:inherit}
 .ws-qrow .m{display:flex;align-items:center;gap:7px;margin-top:5px;flex-wrap:wrap}
 .ws-cdpill{font-family:var(--num);font-size:11px;font-weight:600;padding:2px 8px;border-radius:7px;flex:0 0 auto}
 .ws-cdpill.cd-over{background:var(--sig-soft);color:var(--sig-ink)}.ws-cdpill.cd-soon{background:var(--warn-soft);color:var(--warn)}.ws-cdpill.cd-ok{background:var(--sunk);color:var(--mut)}
-.ws-read{padding:16px 20px;overflow:auto;flex:1}
+.ws-read{padding:16px 20px}
 .ws-ctx{display:flex;align-items:center;gap:10px;flex-wrap:wrap;background:var(--card-2);border:1px solid var(--line);border-radius:12px;padding:11px 14px;margin-bottom:14px}
 .ws-ctx .qpa{margin-left:auto;text-align:right}.ws-ctx .qpa .n{font-weight:600}
 .ws-thread{display:flex;flex-direction:column;gap:11px;margin:6px 0 12px}
@@ -562,7 +574,7 @@ input,select,textarea{color:var(--ink);font-family:inherit}
 .ws-reply input{flex:1;padding:11px 13px;border:1px solid var(--line-2);border-radius:12px;font:inherit;font-size:13px}
 .ws-toolbar{display:flex;gap:7px;flex-wrap:wrap;align-items:center;margin:6px 0}
 .ws-toolbar .btn,.ws-toolbar a.btn{text-decoration:none}
-.ws-rail{padding:14px 15px;overflow:auto;background:var(--card-2)}.ws-rail h3{font-family:var(--disp);font-size:13px;font-weight:600;margin-bottom:8px}
+.ws-rail{padding:14px 15px;background:var(--card-2)}.ws-rail h3{font-family:var(--disp);font-size:13px;font-weight:600;margin-bottom:8px}
 .ws-radar{display:flex;flex-direction:column;gap:7px;margin-bottom:16px}
 .ws-radrow{display:flex;align-items:center;gap:9px;background:var(--card);border:1px solid var(--line);border-radius:10px;padding:8px 10px;cursor:pointer}
 .ws-radrow:hover{box-shadow:var(--sh-1)}
@@ -583,7 +595,7 @@ input,select,textarea{color:var(--ink);font-family:inherit}
 .ws-more{font-size:10px;font-weight:600;color:var(--faint);padding:1px 4px}
 
 /* week */
-.ws-weekwrap{border-top:1px solid var(--line);flex:1;display:flex;flex-direction:column;min-height:0;overflow:auto}
+.ws-weekwrap{border-top:1px solid var(--line);display:flex;flex-direction:column}
 .ws-wknav{display:flex;align-items:center;justify-content:center;gap:12px;padding:10px}
 .ws-weekgrid{display:grid;grid-template-columns:160px 1fr;flex:1}
 .ws-wkover{border-right:1px solid var(--line);background:var(--sig-soft);padding:12px 12px}
@@ -601,7 +613,7 @@ input,select,textarea{color:var(--ink);font-family:inherit}
 .ws-wkevs{padding:8px 8px 0;display:flex;flex-direction:column;gap:6px}
 
 /* month */
-.ws-mwrap{border-top:1px solid var(--line);flex:1;display:flex;flex-direction:column;min-height:0;overflow:auto}
+.ws-mwrap{border-top:1px solid var(--line);display:flex;flex-direction:column}
 .ws-mnav{display:flex;align-items:center;justify-content:center;gap:16px;padding:11px}
 .ws-mnav h3{font-family:var(--disp);font-weight:500;font-size:18px}
 .ws-navb{width:30px;height:30px;border-radius:9px;border:1px solid var(--line);background:var(--card);cursor:pointer;color:var(--mut);font-size:15px}
