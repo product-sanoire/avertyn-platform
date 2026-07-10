@@ -3,7 +3,8 @@ import { useEffect, useState, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "../../lib/supabaseClient";
 import { money, untilLabel, caseIdentity } from "../../lib/format";
-import { InboxView, TasksView, CalendarView, PredictionsView } from "./ops";
+import { PredictionsView } from "./ops";
+import { WorkspaceHub } from "./workspace";
 import { InitiatorsView } from "./tiera";
 import { ImportHub } from "./import";
 import { CommandPalette } from "./palette";
@@ -14,7 +15,6 @@ import Claims from "../dispute/[id]/Claims";
 
 const TABS = ["Overview", "Cases", "Intelligence", "Workspace", "Filing", "Admin"];
 const INTEL = [["initiators", "Initiators & IDREs"], ["exposure", "Employer exposure"]];
-const WORKSPACE = [["inbox", "Inbox"], ["tasks", "Tasks"], ["calendar", "Calendar"]];
 const STAGES = [["all", "All"], ["due", "Due soon"], ["incoming", "Incoming"], ["eligibility", "Eligibility"], ["qpa", "QPA defense"], ["respond", "Respond & pay"]];
 const mkg = { pass: ["pass", "✓"], fail: ["fail", "×"], warn: ["warn", "!"], na: ["na", "–"] };
 
@@ -102,7 +102,6 @@ export default function Dashboard() {
   const [briefFilter, setBriefFilter] = useState("all");   // all | draft | in_review | approved | filed | sealed | none
   const [phaseFilter, setPhaseFilter] = useState("all");   // all | open_negotiation | idr
   const [selected, setSelected] = useState(() => new Set());
-  const [ws, setWs] = useState("inbox");
   const [busy, setBusy] = useState("");
   const [verify, setVerify] = useState(null);
   const [err, setErr] = useState("");
@@ -440,25 +439,8 @@ export default function Dashboard() {
           {intel === "exposure" ? <ExposureView exposure={exposure} embedded /> : <InitiatorsView orgId={orgId} onErr={setErr} embedded />}
         </div>
       ) : tab === 3 ? (
-        <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}>
-          <div className="shead" style={{ padding: "22px 26px 15px", margin: 0, flexWrap: "wrap" }}>
-            <div className="stitle">
-              <h1>Workspace</h1>
-              <span className="sub">{ws === "inbox" ? "Payer & provider correspondence tied to your cases"
-                : ws === "tasks" ? "Your team's open work, prioritized"
-                : "Business-day, holiday-aware windows & events"}</span>
-            </div>
-            <div className="seg">
-              {WORKSPACE.map(([k, l]) => <button key={k} className={ws === k ? "on" : ""} onClick={() => setWs(k)}>{l}</button>)}
-            </div>
-          </div>
-          {ws === "inbox" ? (
-            <div style={{ flex: 1, overflow: "hidden" }}><InboxView email={email} orgId={orgId} onErr={setErr} /></div>
-          ) : (
-            <div style={{ flex: 1, overflow: "auto", padding: "18px 24px 22px" }}>
-              {ws === "tasks" ? <TasksView email={email} orgId={orgId} userId={userId} onErr={setErr} embedded /> : <CalendarView onErr={setErr} embedded />}
-            </div>
-          )}
+        <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "auto" }}>
+          <WorkspaceHub email={email} orgId={orgId} userId={userId} onErr={setErr} />
         </div>
       ) : tab === 4 ? (
         <div style={{ flex: 1, overflow: "auto", padding: 22 }}>
