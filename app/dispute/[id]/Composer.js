@@ -34,6 +34,22 @@ const KIND_LABEL = {
   case_packet: "Filing packet",
 };
 
+// Brief lifecycle: draft -> in review -> approved -> filed (separate from the tamper-evident seal).
+const STATUS_LABEL = { draft: "Draft", in_review: "In review", approved: "Approved", filed: "Filed" };
+const STATUS_TONE = { draft: "grey", in_review: "amber", approved: "green", filed: "ink" };
+const STATUS_ORDER = ["draft", "in_review", "approved", "filed"];
+
+// Argument templates that can be folded into a one-click packet as extra sections,
+// on top of the always-included cover letter + comprehensive brief.
+const PACKET_EXTRAS = [
+  "batching_objection",
+  "idre_conflict_objection",
+  "member_protection_notice",
+  "cost_share_correction",
+  "qpa_disclosure",
+  "state_redirection",
+];
+
 export default function Composer({ dispute }) {
   const id = dispute?.id;
   const [docs, setDocs] = useState([]);
@@ -42,6 +58,7 @@ export default function Composer({ dispute }) {
   const [busy, setBusy] = useState("");
   const [packetOpen, setPacketOpen] = useState(false);
   const [packetSigner, setPacketSigner] = useState("");
+  const [packetSections, setPacketSections] = useState([]);
 
   const loadDocs = useCallback(async () => {
     if (!id) return;
@@ -168,12 +185,22 @@ export default function Composer({ dispute }) {
     const { data, error } = await supabase.rpc("assemble_case_packet", {
       p_dispute: id,
       p_answers: { signer_name: packetSigner.trim(), signer_title: "Authorized Plan Representative" },
+      p_sections: packetSections,
     });
     setBusy("");
     if (error) { setErr(error.message); return; }
-    setPacketOpen(false); setPacketSigner("");
+    setPacketOpen(false); setPacketSigner(""); setPacketSections([]);
     await loadDocs();
     openEditor(data);          // data = new packet doc uuid
+  }
+
+  // ---- brief lifecycle status (draft / in review / approved / filed) ----
+  async function setDocStatus(next) {
+    if (!doc?.id) return;
+    const { data, error } = await supabase.rpc("set_document_status", { p_doc: doc.id, p_status: next });
+    if (error || data?.ok === false) { setErr(error?.message || data?.reason || "Could not update status."); return; }
+    setDoc((d) => ({ ...d, status: next }));
+    loadDocs(); loadMeta(doc.id);
   }
 
   // ---- unified packet: server renders the brief to PDF + appends exhibits, one continuous file ----
@@ -297,23 +324,40 @@ export default function Composer({ dispute }) {
             {docs.length} document{docs.length === 1 ? "" : "s"} · generated from templates, editable, e-signable
           </span>
           <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
-            {packetOpen ? (
-              <>
-                <input className="dsel" placeholder="Signer name" value={packetSigner}
-                  onChange={(e) => setPacketSigner(e.target.value)} style={{ padding: "8px 10px", minWidth: 150 }} />
-                <button className="btn btn-a" disabled={busy === "packet"} onClick={assemblePacket}>
-                  {busy === "packet" ? "Assembling…" : "Build packet →"}
-                </button>
-                <button className="mini" onClick={() => { setPacketOpen(false); setPacketSigner(""); }}>Cancel</button>
-              </>
-            ) : (
-              <button className="btn btn-s" onClick={() => setPacketOpen(true)} title="Auto-assemble the arguments that fit this case into one multi-section brief">
-                ⤓ One-click filing packet
-              </button>
-            )}
+            <button className="btn btn-s" onClick={() => setPacketOpen((v) => !v)} title="Assemble the cover letter + comprehensive brief (and any extra sections) into one multi-section brief">
+              ⤓ One-click filing packet
+            </button>
             <button className="btn btn-a" onClick={openWizard}>+ New from template</button>
           </div>
         </div>
+
+        {packetOpen && (
+          <div style={packetPanel}>
+            <div className="rlabel" style={{ marginBottom: 4 }}>Assemble filing packet</div>
+            <p className="muted" style={{ fontSize: 12, margin: "0 0 10px" }}>
+              Always includes an IDR cover letter and the comprehensive brief (Introduction, Statement of Facts,
+              a per-finding eligibility argument, the alternative-QPA argument, and the Conclusion). Tick any extra
+              argument sections to fold in — each becomes its own page-broken section.
+            </p>
+            <input className="dsel" placeholder="Signer name" value={packetSigner}
+              onChange={(e) => setPacketSigner(e.target.value)} style={{ padding: "8px 10px", minWidth: 200, marginBottom: 10 }} />
+            <div style={{ display: "flex", flexWrap: "wrap", gap: "8px 18px", margin: "2px 0 12px" }}>
+              {PACKET_EXTRAS.map((code) => (
+                <label key={code} style={{ display: "flex", gap: 6, alignItems: "center", fontSize: 12.5, cursor: "pointer" }}>
+                  <input type="checkbox" checked={packetSections.includes(code)}
+                    onChange={(e) => setPacketSections((s) => e.target.checked ? [...s, code] : s.filter((x) => x !== code))} />
+                  {KIND_LABEL[code] || code}
+                </label>
+              ))}
+            </div>
+            <div style={{ display: "flex", gap: 8 }}>
+              <button className="btn btn-a" disabled={busy === "packet"} onClick={assemblePacket}>
+                {busy === "packet" ? "Assembling…" : "Build packet →"}
+              </button>
+              <button className="mini" onClick={() => { setPacketOpen(false); setPacketSigner(""); setPacketSections([]); }}>Cancel</button>
+            </div>
+          </div>
+        )}
         {docs.length === 0 ? (
           <p className="muted" style={{ padding: "12px 0" }}>No documents yet. Generate an argument document from a template — it auto-fills from this case.</p>
         ) : (
@@ -327,10 +371,15 @@ export default function Composer({ dispute }) {
                   </span>
                 </div>
                 <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-                  <span className={"badge b-" + (dc.esign_status === "signed" ? "green" : "grey")}>
-                    <i className={"dot d-" + (dc.esign_status === "signed" ? "green" : "grey")} />
-                    {dc.esign_status === "signed" ? "Signed" : "Draft"}
+                  <span className={"badge b-" + (STATUS_TONE[dc.status] || "grey")}>
+                    <i className={"dot d-" + (STATUS_TONE[dc.status] || "grey")} />
+                    {STATUS_LABEL[dc.status] || "Draft"}
                   </span>
+                  {dc.esign_status === "signed" && (
+                    <span className="badge b-green" title={"Sealed" + (dc.signed_by ? " by " + dc.signed_by : "")}>
+                      <i className="dot d-green" />Sealed
+                    </span>
+                  )}
                   <button className="mini" onClick={() => openEditor(dc.id)}>Open</button>
                 </div>
               </div>
@@ -446,6 +495,18 @@ export default function Composer({ dispute }) {
           </span>
         </div>
         <h3 style={{ fontFamily: "var(--disp,serif)", margin: "8px 0 4px" }}>{doc.title}</h3>
+
+        <div style={{ display: "flex", gap: 8, alignItems: "center", margin: "2px 0 12px", flexWrap: "wrap" }}>
+          <span className="rlabel" style={{ margin: 0 }}>Status</span>
+          <select className="dsel" value={doc.status || "draft"} onChange={(e) => setDocStatus(e.target.value)}
+            style={{ padding: "6px 10px" }}>
+            {STATUS_ORDER.map((s) => <option key={s} value={s}>{STATUS_LABEL[s]}</option>)}
+          </select>
+          <span className={"badge b-" + (STATUS_TONE[doc.status] || "grey")}>
+            <i className={"dot d-" + (STATUS_TONE[doc.status] || "grey")} />{STATUS_LABEL[doc.status] || "Draft"}
+          </span>
+          {signed && <span className="badge b-green"><i className="dot d-green" />Sealed</span>}
+        </div>
 
         {!signed && (
           <div className="doc-toolbar">
@@ -597,5 +658,6 @@ const safeName = (s) => String(s || "document").replace(/[^a-z0-9]+/gi, "-").rep
 // ---- inline layout ----
 const rowBetween = { display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, flexWrap: "wrap" };
 const docRow = { display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, padding: "11px 0", borderBottom: "1px solid var(--line,#eee)" };
+const packetPanel = { border: "1px solid var(--line,#eee)", borderRadius: 12, padding: "14px 16px", margin: "12px 0 4px", background: "var(--card,#fff)" };
 const wizardGrid = { display: "grid", gridTemplateColumns: "minmax(0,1fr) minmax(0,1.1fr)", gap: 20, marginTop: 12, alignItems: "start" };
 const qLabel = { display: "block", fontWeight: 600, fontSize: 13, marginBottom: 2 };
