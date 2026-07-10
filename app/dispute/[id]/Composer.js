@@ -8,6 +8,7 @@
 // list_documents, get_document, sign_document).
 import { useEffect, useState, useCallback, useRef } from "react";
 import { supabase } from "../../../lib/supabaseClient";
+import Redactor from "./Redactor";
 
 const KIND_LABEL = {
   challenge_letter: "Eligibility challenge",
@@ -82,6 +83,7 @@ export default function Composer({ dispute }) {
   const [fileSort, setFileSort] = useState("date");
   const [editFile, setEditFile] = useState(null);   // inline metadata editor: {id, category, tags, party, doc_date}
   const [uploadCat, setUploadCat] = useState("evidence");
+  const [redactFile, setRedactFile] = useState(null);
   const loadEvidence = useCallback(async () => {
     if (!id) return;
     const { data } = await supabase.rpc("list_evidence", { p_dispute: id });
@@ -524,6 +526,7 @@ export default function Composer({ dispute }) {
                     <div style={{ display: "flex", gap: 6, alignItems: "center", flexShrink: 0 }}>
                       <span className={"badge b-" + tone}><i className={"dot d-" + tone} />{ev.status}</span>
                       <button className="mini" onClick={() => downloadFile(ev)}>Download</button>
+                      {/(pdf|image)/.test(ev.mime || "") && <button className="mini" onClick={() => setRedactFile(ev)} title="Redact PHI/PII (true burn-in)">Redact</button>}
                       <button className="mini" onClick={() => (editing ? setEditFile(null) : beginEdit(ev))}>{editing ? "Close" : "Edit"}</button>
                       {ev.status !== "scanning" && <button className="mini" disabled={evBusy} onClick={() => rescan(ev.id)} title="Re-run AI scan">Scan</button>}
                       <button className="mini" onClick={() => removeEvidence(ev.id)} title="Delete file">✕</button>
@@ -544,6 +547,11 @@ export default function Composer({ dispute }) {
               );
             })}
           </>
+        )}
+        {redactFile && (
+          <Redactor file={redactFile} disputeId={id} orgId={dispute?.org_id}
+            onClose={() => setRedactFile(null)}
+            onSaved={() => { setRedactFile(null); loadEvidence(); }} />
         )}
       </div>
     );
