@@ -344,6 +344,20 @@ export default function Dashboard() {
     return c;
   })();
   const pickBrief = (k) => { setBriefFilter(k); setTab(1); setStage("all"); };
+  async function exportFiledBriefs() {
+    const { data, error } = await supabase.rpc("list_filed_briefs");
+    if (error) { setErr(error.message); return; }
+    if (!data || data.length === 0) { setErr("No filed briefs to export yet."); return; }
+    downloadCSV("avertyn-filed-briefs.csv", data, [
+      { h: "case", f: (r) => r.dispute_ref },
+      { h: "title", f: (r) => r.title },
+      { h: "type", f: (r) => (r.kind || "").replace(/_/g, " ") },
+      { h: "signer", f: (r) => r.signer || "" },
+      { h: "sealed", f: (r) => (r.sealed ? "yes" : "no") },
+      { h: "signed_at", f: (r) => (r.signed_at ? new Date(r.signed_at).toISOString().slice(0, 10) : "") },
+      { h: "last_updated", f: (r) => (r.updated_at ? new Date(r.updated_at).toISOString().slice(0, 10) : "") },
+    ]);
+  }
 
   return (
     <div className="app">
@@ -384,7 +398,7 @@ export default function Dashboard() {
           <CommandCenter metrics={metrics} score={score} awardsM={awardsM} agentM={agentM}
             scorecard={scorecard} gap={gap} onVerify={verifyLedger} onExport={exportData}
             onAutopilot={runAutopilot} busy={busy} verify={verify}
-            briefCounts={briefCounts} onPickBrief={pickBrief} />
+            briefCounts={briefCounts} onPickBrief={pickBrief} onExportFiled={exportFiledBriefs} />
           <PredictionsView embedded onErr={setErr} onOpen={(id) => { setSel(id); setTab(1); setStage("all"); }} />
         </div>
       ) : tab === 2 ? (
@@ -611,7 +625,7 @@ function read(r) {
 
 function pct(n) { return n == null ? "—" : Math.round(Number(n)) + "%"; }
 
-function CommandCenter({ metrics, score, awardsM, agentM, scorecard, gap, onVerify, onExport, onAutopilot, busy, verify, briefCounts, onPickBrief }) {
+function CommandCenter({ metrics, score, awardsM, agentM, scorecard, gap, onVerify, onExport, onAutopilot, busy, verify, briefCounts, onPickBrief, onExportFiled }) {
   const overrideRate = agentM && (agentM.human_released + agentM.human_rejected)
     ? Math.round((agentM.human_rejected / (agentM.human_released + agentM.human_rejected)) * 100) : 0;
   const dlr = score?.default_loss_rate;
@@ -649,9 +663,13 @@ function CommandCenter({ metrics, score, awardsM, agentM, scorecard, gap, onVeri
               <div key={k} className="kpi-tile" role="button" tabIndex={0} style={{ cursor: "pointer", minWidth: 108 }}
                 onClick={() => onPickBrief && onPickBrief(k)}
                 onKeyDown={(e) => { if ((e.key === "Enter" || e.key === " ") && onPickBrief) { e.preventDefault(); onPickBrief(k); } }}
-                title={`Show ${label} cases`}>
+                title={k === "filed" ? "Filed cases — click to filter, or export the manifest" : `Show ${label} cases`}>
                 <div className="l"><i className={"dot d-" + tone} style={{ marginRight: 6 }} />{label}</div>
                 <div className="n">{briefCounts[k] ?? 0}</div>
+                {k === "filed" && (
+                  <button className="mini" style={{ marginTop: 6 }} onClick={(e) => { e.stopPropagation(); onExportFiled && onExportFiled(); }}
+                    title="Download a CSV manifest of every filed brief">⤓ Export CSV</button>
+                )}
               </div>
             ))}
           </div>
