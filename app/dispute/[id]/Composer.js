@@ -105,7 +105,7 @@ export default function Composer({ dispute }) {
       if (ae) throw ae;
       // tag it with the chosen category on the way in
       if (uploadCat && uploadCat !== "evidence") {
-        await supabase.rpc("set_file_meta", { p_id: evId, p_category: uploadCat }).catch(() => {});
+        try { await supabase.rpc("set_file_meta", { p_id: evId, p_category: uploadCat }); } catch (_) {}
       }
       await loadEvidence();
       // fire-and-refresh: AI scan

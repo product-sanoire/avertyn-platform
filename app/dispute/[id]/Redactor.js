@@ -188,7 +188,7 @@ export default function Redactor({ file, disputeId, orgId, onClose, onSaved }) {
       const { data: evId, error: ae } = await supabase.rpc("add_evidence", {
         p_dispute: disputeId, p_path: path, p_filename: base + " (redacted).pdf", p_mime: "application/pdf", p_size: blob.size });
       if (ae) throw ae;
-      await supabase.rpc("set_file_meta", { p_id: evId, p_category: file.category || "evidence", p_tags: ["redacted"] }).catch(() => {});
+      try { await supabase.rpc("set_file_meta", { p_id: evId, p_category: file.category || "evidence", p_tags: ["redacted"] }); } catch (_) { /* tag is best-effort */ }
       onSaved && onSaved();
     } catch (e) { setErr("Could not build the redacted file: " + (e.message || e)); }
     setApplying(false);
