@@ -69,6 +69,7 @@ export default function Dashboard() {
   const [orgId, setOrgId] = useState(null);
   const [rows, setRows] = useState([]);
   const [briefMap, setBriefMap] = useState({});   // dispute_id -> { status, sealed } (furthest-along brief)
+  const [negMap, setNegMap] = useState({});       // dispute_id -> latest negotiation state (% of QPA)
   const [sel, setSel] = useState(null);
   const [detail, setDetail] = useState(null);
   const [metrics, setMetrics] = useState(null);
@@ -129,12 +130,14 @@ export default function Dashboard() {
         supabase.from("autonomy_settings").select("action_type, mode, max_amount"),
         supabase.from("notifications").select("id, dispute_id, kind, title, body, severity, read, created_at").order("created_at", { ascending: false }).limit(30),
         supabase.from("documents").select("dispute_id, status, esign_status"),
+        supabase.from("dispute_negotiation").select("dispute_id, last_amount, last_pct, last_party, last_status, rounds"),
       ]);
       const firstErr = res.find((r) => r.error)?.error;
       if (firstErr) throw firstErr;
-      const [d, m, sc2, aw, am, sc, g, ex, q, f, au, nl, db] = res.map((r) => r.data);
+      const [d, m, sc2, aw, am, sc, g, ex, q, f, au, nl, db, neg] = res.map((r) => r.data);
       setRows(d || []);
       setBriefMap(briefMapFrom(db || []));
+      setNegMap(Object.fromEntries((neg || []).map((n) => [n.dispute_id, n])));
       setMetrics(m || null); setScore(sc2 || null); setAwardsM(aw || null); setAgentM(am || null);
       setScorecard(sc || []); setGap(g || []); setExposure(ex || []);
       setQueue(q || []); setFeed(f || []); setAutonomy(au || []);
@@ -217,7 +220,7 @@ export default function Dashboard() {
       .on("postgres_changes", { event: "*", schema: "public", table: "predictions" }, loadShell)
       .on("postgres_changes", { event: "*", schema: "public", table: "eligibility_findings" }, detail)
       .on("postgres_changes", { event: "*", schema: "public", table: "qpa_records" }, detail)
-      .on("postgres_changes", { event: "*", schema: "public", table: "offers" }, detail)
+      .on("postgres_changes", { event: "*", schema: "public", table: "offers" }, () => { detail(); loadShell(); })
       .on("postgres_changes", { event: "*", schema: "public", table: "documents" }, () => { detail(); loadShell(); })
       .subscribe();
     return () => { supabase.removeChannel(ch); };
@@ -546,6 +549,13 @@ export default function Dashboard() {
                           </span>
                         )}
                         {briefMap[r.id]?.sealed && <span className="badge b-green" title="A document on this case is signed &amp; sealed"><i className="dot d-green" />Sealed</span>}
+                        {negMap[r.id] && (
+                          <span className={"badge b-" + (negMap[r.id].last_party === "plan" ? "ind" : "amber")}
+                            title={`Latest offer: ${negMap[r.id].last_party === "plan" ? "plan" : "provider"} · ${money(negMap[r.id].last_amount)} · round ${negMap[r.id].rounds}`}>
+                            <i className={"dot d-" + (negMap[r.id].last_party === "plan" ? "ind" : "amber")} />
+                            {negMap[r.id].last_pct != null ? Math.round(negMap[r.id].last_pct) + "% QPA" : money(negMap[r.id].last_amount)}
+                          </span>
+                        )}
                       </div>
                     </div>
                   );

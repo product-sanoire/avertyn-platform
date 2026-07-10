@@ -7,6 +7,7 @@ import { money, untilLabel, caseIdentity } from "../../../lib/format";
 import IdrPanel from "./IdrPanel";
 import Composer from "./Composer";
 import Claims from "./Claims";
+import Negotiation from "./Negotiation";
 
 const mark = { pass: ["ok", "✓"], fail: ["no", "×"], warn: ["warn", "!"], na: ["grey", "–"] };
 
@@ -28,7 +29,6 @@ export default function CaseWorkspace() {
   const [d, setD] = useState(null);
   const [findings, setFindings] = useState([]);
   const [qpa, setQpa] = useState(null);
-  const [offers, setOffers] = useState([]);
   const [deadlines, setDeadlines] = useState([]);
   const [briefDocs, setBriefDocs] = useState([]);
   const [busy, setBusy] = useState(false);
@@ -37,19 +37,18 @@ export default function CaseWorkspace() {
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) { router.push("/login"); return; }
 
-    const [{ data: disp }, { data: fnd }, { data: q }, { data: off }, { data: dl }, { data: docs }] = await Promise.all([
+    const [{ data: disp }, { data: fnd }, { data: q }, { data: dl }, { data: docs }] = await Promise.all([
       supabase.from("disputes")
         .select("*, plans(name), employers(name), initiators(name)").eq("id", id).single(),
       supabase.from("eligibility_findings")
         .select("result, confidence, detail, eligibility_rules(name, code, severity, category)")
         .eq("dispute_id", id),
       supabase.from("qpa_records").select("*").eq("dispute_id", id).maybeSingle(),
-      supabase.from("offers").select("*").eq("dispute_id", id).order("submitted_at"),
       supabase.from("deadlines").select("*").eq("dispute_id", id).order("due_at"),
       supabase.from("documents").select("status, esign_status").eq("dispute_id", id),
     ]);
     setD(disp || null); setFindings(fnd || []); setQpa(q || null);
-    setOffers(off || []); setDeadlines(dl || []); setBriefDocs(docs || []); setLoading(false);
+    setDeadlines(dl || []); setBriefDocs(docs || []); setLoading(false);
   }, [id, router]);
 
   useEffect(() => { load(); }, [load]);
@@ -157,18 +156,8 @@ export default function CaseWorkspace() {
           )}
         </Panel>
 
-        {/* Offers */}
-        <Panel title="Offers & negotiation">
-          {offers.length === 0 ? <Empty text="No offers logged." /> :
-            offers.map((o) => (
-              <div key={o.id} style={row}>
-                <span className={"badge " + (o.party === "plan" ? "b-ind" : "b-amber")}>{o.party}</span>
-                <div><b className="mono">{money(o.amount)}</b>
-                  <span className="muted" style={{ display: "block", fontSize: 12.5 }}>{o.kind} · {o.note}</span>
-                </div>
-              </div>
-            ))}
-        </Panel>
+        {/* QPA calculator + round-by-round negotiation ledger */}
+        <Negotiation dispute={d} onChanged={load} />
 
         {/* Deadlines */}
         <Panel title="Deadlines">
