@@ -91,7 +91,7 @@ export function InboxView({ email, orgId, onErr }) {
 }
 
 // ---------------------------------------------------------------- Tasks
-export function TasksView({ email, orgId, userId, onErr }) {
+export function TasksView({ email, orgId, userId, onErr, embedded }) {
   const [tasks, setTasks] = useState([]);
   const [title, setTitle] = useState("");
   const [busy, setBusy] = useState(false);
@@ -129,8 +129,8 @@ export function TasksView({ email, orgId, userId, onErr }) {
   const done = tasks.filter((t) => t.status === "done");
   return (
     <div>
-      <div className="dh"><h1>Tasks</h1><span className="sub">{open.length} open · {done.length} done</span></div>
-      <div style={{ display: "flex", gap: 8, marginTop: 14, maxWidth: 560 }}>
+      {!embedded && <div className="dh"><h1>Tasks</h1><span className="sub">{open.length} open · {done.length} done</span></div>}
+      <div style={{ display: "flex", gap: 8, marginTop: embedded ? 0 : 14, maxWidth: 560 }}>
         <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Add a task…"
           onKeyDown={(e) => e.key === "Enter" && add()}
           style={{ flex: 1, padding: "11px 13px", border: "1px solid var(--line)", borderRadius: 10, font: "inherit", fontSize: 13 }} />
@@ -170,7 +170,7 @@ function TaskRow({ t, onToggle }) {
 
 // ---------------------------------------------------------------- Calendar
 const CAL_TONE = { deadline: "red", filing: "clay", meeting: "indigo", reminder: "sage" };
-export function CalendarView({ onErr }) {
+export function CalendarView({ onErr, embedded }) {
   const [items, setItems] = useState([]);
   const [offset, setOffset] = useState(0);
   const load = useCallback(async () => {
@@ -196,17 +196,21 @@ export function CalendarView({ onErr }) {
   const cells = []; for (let i = 0; i < firstDow; i++) cells.push(null); for (let d = 1; d <= daysInMonth; d++) cells.push(d);
   const t = new Date(); const isToday = (d) => d && offset === 0 && t.getFullYear() === year && t.getMonth() === month && t.getDate() === d;
 
+  const nav = (
+    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+      <button className="mini" onClick={() => setOffset(offset - 1)}>‹</button>
+      <b style={{ fontFamily: "var(--disp)", fontSize: 17, minWidth: 158, textAlign: "center" }}>{monthName}</b>
+      <button className="mini" onClick={() => setOffset(offset + 1)}>›</button>
+      {offset !== 0 && <button className="mini" onClick={() => setOffset(0)}>Today</button>}
+    </div>
+  );
   return (
     <div>
-      <div className="dh"><h1>Calendar</h1><span className="sub">Business-day, holiday-aware windows</span>
-        <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 8 }}>
-          <button className="mini" onClick={() => setOffset(offset - 1)}>‹</button>
-          <b style={{ fontFamily: "var(--disp)", fontSize: 17, minWidth: 158, textAlign: "center" }}>{monthName}</b>
-          <button className="mini" onClick={() => setOffset(offset + 1)}>›</button>
-          {offset !== 0 && <button className="mini" onClick={() => setOffset(0)}>Today</button>}
-        </div>
-      </div>
-      <div className="panel" style={{ marginTop: 16 }}>
+      {embedded
+        ? <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 12 }}>{nav}</div>
+        : <div className="dh"><h1>Calendar</h1><span className="sub">Business-day, holiday-aware windows</span>
+          <div style={{ marginLeft: "auto" }}>{nav}</div></div>}
+      <div className="panel" style={{ marginTop: embedded ? 0 : 16 }}>
         <div className="calgrid calhead">
           {["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map((d) => <div key={d} className="calh">{d}</div>)}
         </div>

@@ -28,10 +28,14 @@ export function AdminView({ orgId, onErr }) {
   const [seg, setSeg] = useState("access");
   return (
     <div>
-      <div className="dh"><h1>Admin</h1>
-        <span className="sub">Identity, provisioning, scheduled reporting and API distribution — the controls IT and compliance ask for</span></div>
-      <div className="seg" style={{ marginTop: 12, marginBottom: 4 }}>
-        {ADMIN.map(([k, l]) => <button key={k} className={seg === k ? "on" : ""} onClick={() => setSeg(k)}>{l}</button>)}
+      <div className="shead">
+        <div className="stitle">
+          <h1>Admin</h1>
+          <span className="sub">Identity, provisioning, scheduled reporting and API distribution — the controls IT and compliance ask for</span>
+        </div>
+        <div className="seg">
+          {ADMIN.map(([k, l]) => <button key={k} className={seg === k ? "on" : ""} onClick={() => setSeg(k)}>{l}</button>)}
+        </div>
       </div>
       {seg === "access" ? <AccessView orgId={orgId} onErr={onErr} />
         : seg === "reports" ? <ReportsView orgId={orgId} onErr={onErr} />

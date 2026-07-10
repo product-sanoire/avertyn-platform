@@ -12,7 +12,7 @@ const API_BASE = (process.env.NEXT_PUBLIC_SUPABASE_URL || "https://ssjougrsaecdw
 const RESULT_MK = { pass: "ok", fail: "fail", warn: "warn", na: "na" };
 
 // ============================================================ Initiators
-export function InitiatorsView({ orgId, onErr }) {
+export function InitiatorsView({ orgId, onErr, embedded }) {
   const [rows, setRows] = useState([]);
   const [idre, setIdre] = useState([]);
 
@@ -40,10 +40,10 @@ export function InitiatorsView({ orgId, onErr }) {
 
   return (
     <div>
-      <div className="dh"><h1>Initiators &amp; IDREs</h1>
-        <span className="sub">Who's filing against your plans, how weak their filings are, and how each IDRE behaves — your negotiation leverage</span></div>
+      {!embedded && <div className="dh"><h1>Initiators &amp; IDREs</h1>
+        <span className="sub">Who's filing against your plans, how weak their filings are, and how each IDRE behaves — your negotiation leverage</span></div>}
 
-      <div className="cards" style={{ marginTop: 14 }}>
+      <div className="cards" style={{ marginTop: embedded ? 4 : 14 }}>
         <div className="kpi-tile"><div className="l">Initiators</div><div className="n">{rows.length}</div></div>
         <div className="kpi-tile"><div className="l">Disputes filed</div><div className="n">{totDisputes}</div></div>
         <div className="kpi-tile"><div className="l">Avg ineligibility</div><div className="n">{wIneligible}</div><div className="goal">weighted across filings</div></div>
