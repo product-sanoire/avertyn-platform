@@ -49,12 +49,17 @@ function briefMapFrom(docs) {
   }
   return m;
 }
+// Export leads with the legal identifier (claim # / dispute ID) — the number that
+// travels with the case through federal IDR — then the operator's own internal
+// ref, then the rest of the case facts.
 const DISPUTE_CSV_COLS = [
-  { h: "ref", f: (r) => r.external_ref }, { h: "initiator", f: (r) => r.initiators?.name }, { h: "plan", f: (r) => r.plans?.name },
+  { h: "case_no", f: (r) => caseIdentity(r).number }, { h: "id_type", f: (r) => caseIdentity(r).label },
+  { h: "claim_number", f: (r) => r.claim_number }, { h: "dispute_number", f: (r) => r.idr_registration_number },
+  { h: "internal_ref", f: (r) => r.external_ref },
+  { h: "phase", f: (r) => (r.phase === "idr" ? "IDR" : "open_negotiation") },
+  { h: "initiator", f: (r) => r.initiators?.name }, { h: "plan", f: (r) => r.plans?.name },
   { h: "cpt", f: (r) => r.cpt_code }, { h: "demand", f: (r) => r.demand_amount }, { h: "qpa", f: (r) => r.qpa_amount },
   { h: "eligibility_score", f: (r) => r.eligibility_score }, { h: "state", f: (r) => r.workflow_state }, { h: "disposition", f: (r) => r.disposition },
-  { h: "phase", f: (r) => (r.phase === "idr" ? "IDR" : "open_negotiation") },
-  { h: "claim_number", f: (r) => r.claim_number }, { h: "dispute_number", f: (r) => r.idr_registration_number },
 ];
 
 export default function Dashboard() {
@@ -316,8 +321,12 @@ export default function Dashboard() {
   const phaseCounts = rows.reduce((m, r) => { const p = phaseOf(r); m[p] = (m[p] || 0) + 1; return m; }, {});
   const displayed = (() => {
     let arr = filtered;
-    const q = dispQuery.trim().toLowerCase();
-    if (q) arr = arr.filter((r) => (r.external_ref || "").toLowerCase().includes(q) || (r.initiators?.name || "").toLowerCase().includes(q) || (r.cpt_code || "").toLowerCase().includes(q) || (r.claim_number || "").toLowerCase().includes(q) || (r.idr_registration_number || "").toLowerCase().includes(q));
+    const q = dispQuery.trim().toLowerCase().replace(/^#+/, "");   // tolerate a typed "#" prefix
+    if (q) arr = arr.filter((r) => {
+      // Legal identifiers first (claim # / dispute ID), then internal ref, then facts.
+      const hay = [r.claim_number, r.idr_registration_number, r.external_ref, r.initiators?.name, r.cpt_code];
+      return hay.some((v) => (v || "").toLowerCase().replace(/^#+/, "").includes(q));
+    });
     if (phaseFilter !== "all") arr = arr.filter((r) => phaseOf(r) === phaseFilter);
     if (briefFilter !== "all") {
       arr = arr.filter((r) => {
