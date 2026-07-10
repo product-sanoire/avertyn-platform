@@ -276,6 +276,15 @@ export default function Composer({ dispute }) {
   const edRef = useRef(null);
   const saveTimer = useRef(null);
 
+  // Reliably load the document body into the editable area once it's mounted.
+  // (Replaces a setTimeout race that could leave the editor blank.)
+  useEffect(() => {
+    if (view === "editor" && doc && edRef.current) {
+      edRef.current.innerHTML = doc.content || "";
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [view, doc?.id]);
+
   async function loadMeta(docId) {
     const [{ data: pf }, { data: vs }] = await Promise.all([
       supabase.rpc("document_preflight", { p_doc: docId }),
@@ -294,7 +303,7 @@ export default function Composer({ dispute }) {
     setShowVersions(false);
     setView("editor");
     loadMeta(docId);
-    setTimeout(() => { if (edRef.current) edRef.current.innerHTML = data.content || ""; }, 0);
+    // content is loaded into the editor by the effect keyed on [view, doc.id]
   }
 
   function onEdit() {
@@ -313,6 +322,14 @@ export default function Composer({ dispute }) {
     loadDocs(); loadMeta(doc.id);
   }
   const fmt = (cmd, val) => { document.execCommand(cmd, false, val); edRef.current?.focus(); onEdit(); };
+
+  async function deleteDoc(docId) {
+    if (typeof window !== "undefined" && !window.confirm("Delete this document permanently? This can't be undone.")) return;
+    const { data, error } = await supabase.rpc("delete_document", { p_doc: docId });
+    if (error || data?.ok === false) { setErr(error?.message || data?.reason || "Delete failed."); return; }
+    if (doc && doc.id === docId) { setDoc(null); setView("list"); }
+    await loadDocs();
+  }
 
   async function signDoc() {
     if (!signer.trim()) { setErr("Enter a signer name to sign."); return; }
@@ -432,6 +449,7 @@ export default function Composer({ dispute }) {
                     </span>
                   )}
                   <button className="mini" onClick={() => openEditor(dc.id)}>Open</button>
+                  <button className="mini" onClick={() => deleteDoc(dc.id)} title="Delete this document">✕</button>
                 </div>
               </div>
             ))}
@@ -652,6 +670,7 @@ export default function Composer({ dispute }) {
           </button>
           <button className="mini" onClick={exportPDF}>Export PDF</button>
           <button className="mini" onClick={exportDOCX}>Export Word</button>
+          {!signed && <button className="mini" onClick={() => deleteDoc(doc.id)} title="Delete this document">Delete</button>}
         </div>
 
         {showVersions && (
