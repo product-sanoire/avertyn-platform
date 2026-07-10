@@ -179,9 +179,27 @@ function ModuleCard({ t, rows, note }) {
 
 function CaseDetail({ sel }) {
   const lines = sel.lines || [], adj = sel.adjustments || [];
+  const [busy, setBusy] = useState(false);
+  const [lerr, setLerr] = useState("");
+  async function genLetter() {
+    setBusy(true); setLerr("");
+    const { data, error } = await supabase.rpc("render_review_determination", { p_case: sel.case.id });
+    setBusy(false);
+    if (error || !data || !data.ok) { setLerr(error ? error.message : "Could not generate letter"); return; }
+    const w = window.open("", "_blank");
+    if (!w) { setLerr("Pop-up blocked — allow pop-ups to open the letter."); return; }
+    w.document.write('<!doctype html><html><head><meta charset="utf-8"><title>' + (data.title || "Determination") +
+      '</title><style>body{font-family:Georgia,serif;max-width:720px;margin:40px auto;padding:0 24px;line-height:1.55;color:#1a1a1a}.doc-meta{color:#666;font-size:13px}.sig{margin-top:6px}ul{margin:6px 0}</style></head><body>' +
+      data.html + '</body></html>');
+    w.document.close();
+  }
   return (
     <div style={{ background: "var(--paper2,#faf8f6)", border: "1px solid var(--hair,#eee)", borderRadius: 8, padding: 12, margin: "4px 0 12px" }}>
-      <div className="muted" style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: ".05em", marginBottom: 6 }}>Lines</div>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
+        <div className="muted" style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: ".05em" }}>Lines</div>
+        <button className="btn btn-s" disabled={busy} onClick={genLetter}>{busy ? "Generating…" : "Generate determination letter"}</button>
+      </div>
+      {lerr && <div className="badge b-red" style={{ marginBottom: 6, display: "inline-flex", gap: 8 }}><i className="dot d-red" />{lerr}</div>}
       {lines.map((l) => (
         <div key={l.id} className="ver-row" style={{ fontSize: 12.5 }}>
           <span className="code-in">{l.code_system} {l.code}</span>
