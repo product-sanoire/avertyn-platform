@@ -412,3 +412,50 @@ input,select,textarea{color:var(--ink);font-family:inherit}
 .acctmenu .mi.danger{color:var(--sig-ink)}
 .acctmenu .sep{height:1px;background:var(--hair);margin:6px 4px}
 @media(max-width:980px){ .searchc{flex:0;padding:0} .search2{display:none} }
+
+/* ---------- v5 · refined: less round, less filled, more editorial ---------- */
+:root{
+  --r-1:8px; --r-2:9px; --r-3:12px; --r-4:14px;
+  /* hairlines do the separating; shadows step back (cool porcelain tint) */
+  --sh-1:0 1px 1px rgba(24,32,48,.04);
+  --sh-2:0 1px 2px rgba(24,32,48,.05), 0 6px 16px -10px rgba(24,32,48,.12);
+  --sh-3:0 2px 10px rgba(24,32,48,.06), 0 26px 54px -24px rgba(24,32,48,.20);
+  --sh-pop:0 10px 34px -12px rgba(24,32,48,.26);
+}
+/* de-pill the interactive chrome */
+.btn,.mini,.newbtn{border-radius:9px}
+.tab{border-radius:8px}
+.bell{border-radius:9px}
+.kbd{border-radius:5px}
+.toast,.toast button{border-radius:9px}
+.seg{border-radius:10px;background:var(--card-2);padding:3px;box-shadow:inset 0 0 0 1px var(--line)}
+.seg button{border-radius:7px}
+.seg button.on{background:var(--card);box-shadow:var(--sh-1),inset 0 0 0 1px var(--line)}
+/* masthead chips: de-pill (the flatter shadow tokens calm them further) */
+.switch,.switch2,.search,.search2{border-radius:10px}
+.mchip{border-radius:8px}
+.acctbtn{border-radius:10px}
+.acctmenu{border-radius:12px}
+/* tags, not lozenges */
+.badge{border-radius:6px;padding:3px 8px;letter-spacing:.02em}
+.track,.fill{border-radius:4px}
+/* panels & tiles: delineated by a hairline, not floated on a shadow */
+.panel{border-radius:13px;border:1px solid var(--line);box-shadow:none}
+.kpi-tile{border-radius:12px;border:1px solid var(--line);box-shadow:none}
+.kpi-tile:hover{transform:none;box-shadow:var(--sh-1)}
+.box{border-radius:12px;border:1px solid var(--line);box-shadow:none}
+.rcard{border-radius:11px;border:1px solid var(--line);box-shadow:none}
+.excard{border-radius:13px;border:1px solid var(--line);box-shadow:none}
+.excard:hover{transform:none;box-shadow:var(--sh-1)}
+.batchcard{border-radius:11px}
+.modal{border-radius:15px}
+.card{border-radius:15px}
+.feat{border-radius:16px}
+/* rows & buttons: calmer motion, hairline definition */
+.lrow{border-radius:10px}
+.lrow:hover{box-shadow:none;background:var(--card)}
+.lrow.on{box-shadow:none;background:var(--card);border-color:var(--line-2)}
+.btn-s,.mini{box-shadow:inset 0 0 0 1px var(--line)}
+.btn-s:hover,.mini:hover{transform:none;background:var(--card-2);box-shadow:inset 0 0 0 1px var(--line-2)}
+.btn-a:hover{transform:none;box-shadow:var(--sh-2)}
+.tab.on{box-shadow:var(--sh-1)}
