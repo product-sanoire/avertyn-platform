@@ -439,7 +439,7 @@ export default function Dashboard() {
           {intel === "exposure" ? <ExposureView exposure={exposure} embedded /> : <InitiatorsView orgId={orgId} onErr={setErr} embedded />}
         </div>
       ) : tab === 3 ? (
-        <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "auto" }}>
+        <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden", minHeight: 0 }}>
           <WorkspaceHub email={email} orgId={orgId} userId={userId} onErr={setErr} />
         </div>
       ) : tab === 4 ? (

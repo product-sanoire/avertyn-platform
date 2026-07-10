@@ -535,8 +535,8 @@ input,select,textarea{color:var(--ink);font-family:inherit}
 .ws-cchip{font-family:var(--num);font-size:10.5px;font-weight:600;color:var(--ink-2);background:var(--card);border:1px solid var(--line);padding:1px 6px;border-radius:6px;white-space:nowrap}
 
 /* cockpit */
-.ws-cockpit{display:grid;grid-template-columns:1.15fr 1.5fr 258px;flex:1;min-height:520px;border-top:1px solid var(--line)}
-.ws-col{border-right:1px solid var(--line);display:flex;flex-direction:column;min-width:0}.ws-col:last-child{border-right:0}
+.ws-cockpit{display:grid;grid-template-columns:1.15fr 1.5fr 258px;flex:1;min-height:0;border-top:1px solid var(--line)}
+.ws-col{border-right:1px solid var(--line);display:flex;flex-direction:column;min-width:0;min-height:0}.ws-col:last-child{border-right:0}
 .ws-colhd{display:flex;align-items:center;gap:8px;padding:13px 16px 6px}.ws-colhd h3{font-family:var(--disp);font-size:15px;font-weight:500}.ws-colhd .ct{margin-left:auto;font-family:var(--num);font-size:11px;color:var(--faint)}
 .ws-scroll{overflow:auto;flex:1}
 .ws-qgroup{padding:2px 10px 6px}
@@ -583,7 +583,7 @@ input,select,textarea{color:var(--ink);font-family:inherit}
 .ws-more{font-size:10px;font-weight:600;color:var(--faint);padding:1px 4px}
 
 /* week */
-.ws-weekwrap{border-top:1px solid var(--line);flex:1;display:flex;flex-direction:column}
+.ws-weekwrap{border-top:1px solid var(--line);flex:1;display:flex;flex-direction:column;min-height:0;overflow:auto}
 .ws-wknav{display:flex;align-items:center;justify-content:center;gap:12px;padding:10px}
 .ws-weekgrid{display:grid;grid-template-columns:160px 1fr;flex:1}
 .ws-wkover{border-right:1px solid var(--line);background:var(--sig-soft);padding:12px 12px}
@@ -601,7 +601,7 @@ input,select,textarea{color:var(--ink);font-family:inherit}
 .ws-wkevs{padding:8px 8px 0;display:flex;flex-direction:column;gap:6px}
 
 /* month */
-.ws-mwrap{border-top:1px solid var(--line);flex:1;display:flex;flex-direction:column}
+.ws-mwrap{border-top:1px solid var(--line);flex:1;display:flex;flex-direction:column;min-height:0;overflow:auto}
 .ws-mnav{display:flex;align-items:center;justify-content:center;gap:16px;padding:11px}
 .ws-mnav h3{font-family:var(--disp);font-weight:500;font-size:18px}
 .ws-navb{width:30px;height:30px;border-radius:9px;border:1px solid var(--line);background:var(--card);cursor:pointer;color:var(--mut);font-size:15px}
