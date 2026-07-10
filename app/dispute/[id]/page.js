@@ -5,6 +5,7 @@ import Link from "next/link";
 import { supabase } from "../../../lib/supabaseClient";
 import { money, untilLabel } from "../../../lib/format";
 import IdrPanel from "./IdrPanel";
+import Composer from "./Composer";
 
 const mark = { pass: ["ok", "✓"], fail: ["no", "×"], warn: ["warn", "!"], na: ["grey", "–"] };
 
@@ -146,6 +147,11 @@ export default function CaseWorkspace() {
                 </div>
               </div>
             ))}
+        </Panel>
+
+        {/* Argument documents — template-driven, editable, e-signable */}
+        <Panel title="Documents">
+          <Composer dispute={d} />
         </Panel>
 
         {/* CMS Federal IDR Gateway — connector panel */}

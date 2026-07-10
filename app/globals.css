@@ -459,3 +459,42 @@ input,select,textarea{color:var(--ink);font-family:inherit}
 .btn-s:hover,.mini:hover{transform:none;background:var(--card-2);box-shadow:inset 0 0 0 1px var(--line-2)}
 .btn-a:hover{transform:none;box-shadow:var(--sh-2)}
 .tab.on{box-shadow:var(--sh-1)}
+
+
+/* ── Document Composer (template engine) ─────────────────────────────── */
+.doc-preview,.doc-editor{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:22px 24px;font-family:var(--disp);color:var(--ink);line-height:1.55;font-size:14px}
+.doc-preview{max-height:520px;overflow:auto}
+.doc-editor{min-height:420px;outline:none}
+.doc-editor:focus{box-shadow:inset 0 0 0 2px var(--sig-line)}
+.doc-preview p,.doc-editor p{margin:0 0 12px}
+.doc-preview .doc-meta,.doc-editor .doc-meta{color:var(--mut);font-size:12.5px}
+.doc-preview .sig,.doc-editor .sig{margin:14px 0 2px}
+.doc-preview ol.grounds,.doc-editor ol.grounds{margin:6px 0 14px 20px}
+.doc-preview ol.grounds li,.doc-editor ol.grounds li{margin:0 0 8px}
+.doc-toolbar{display:flex;gap:6px;align-items:center;margin:10px 0 8px;padding:6px;background:var(--sunk);border-radius:9px}
+.doc-actions{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:12px;padding-top:12px;border-top:1px solid var(--line)}
+@media print{.doc-toolbar,.doc-actions{display:none}}
+
+/* ── Composer phase 2: citations, benchmark tables, preflight, versions ─── */
+.doc-preview table.bench,.doc-editor table.bench{border-collapse:collapse;margin:8px 0 14px;font-size:13px;width:100%}
+.doc-preview table.bench th,.doc-editor table.bench th{text-align:left;border-bottom:1px solid var(--line-2);padding:6px 8px;color:var(--mut);font-weight:600}
+.doc-preview table.bench td,.doc-editor table.bench td{border-bottom:1px solid var(--line);padding:6px 8px}
+.doc-preview .cite,.doc-editor .cite{color:var(--sig-ink);font-size:12px;font-family:var(--sans)}
+.doc-flags{display:flex;flex-direction:column;gap:6px;margin:12px 0}
+.doc-flag{display:flex;gap:8px;align-items:flex-start;font-size:12.5px;padding:8px 10px;border-radius:8px}
+.doc-flag.error{background:var(--sig-soft);color:var(--sig-ink)}
+.doc-flag.warn{background:var(--warn-soft);color:var(--warn)}
+.doc-flag.info{background:var(--sunk);color:var(--mut)}
+.ver-row{display:flex;gap:10px;align-items:center;font-size:12px;color:var(--mut);padding:6px 0;border-bottom:1px solid var(--hair)}
+.ver-row .vv{font-weight:700;color:var(--ink)}
+/* Template builder */
+.tpl-list{display:flex;flex-direction:column;gap:8px}
+.tpl-card{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:12px 14px;border:1px solid var(--line);border-radius:10px;background:var(--card);cursor:pointer}
+.tpl-card:hover{box-shadow:inset 0 0 0 1px var(--line-2)}
+.clause-row{border:1px solid var(--line);border-radius:9px;padding:10px 12px;margin-bottom:8px;background:var(--card-2)}
+.clause-row textarea{width:100%;font-family:ui-monospace,Menlo,monospace;font-size:12px;border:1px solid var(--line-2);border-radius:6px;padding:6px 8px;background:#fff}
+.code-in{font-family:ui-monospace,Menlo,monospace;font-size:12px}
+
+/* Evidence exhibits list (rendered in documents + exports handled inline) */
+.doc-preview ul.exhibits,.doc-editor ul.exhibits{margin:6px 0 14px 20px}
+.doc-preview ul.exhibits li,.doc-editor ul.exhibits li{margin:0 0 6px}

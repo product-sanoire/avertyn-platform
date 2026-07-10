@@ -324,6 +324,7 @@ export default function Dashboard() {
           <button className={"mchip alert" + (notifs ? " loud" : "")} title="Notifications" onClick={() => setNotifOpen(true)}>
             <i className={"dot " + (notifs ? "d-red" : "d-green")} />{notifs}
           </button>
+          <a className="btn btn-s" style={{ padding: "8px 14px", textDecoration: "none" }} href="/templates">Templates</a>
           <button className="btn btn-s" style={{ padding: "8px 14px" }} onClick={() => setImportOpen(true)}>+ Import</button>
           <AccountMenu email={email} onSignOut={signOut} onExport={exportData} />
         </div>
