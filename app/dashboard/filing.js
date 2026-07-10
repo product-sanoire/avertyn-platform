@@ -75,7 +75,7 @@ export function FilingView({ orgId, onErr, initialBatch, onConsumeInitial }) {
 
   return (
     <div>
-      <div className="dh"><h1>Filing</h1>
+      <div className="dh"><h1>The pipeline</h1>
         <span className="sub">Batch open disputes under the 2026 batching rules, select a certified IDRE, and file — one regulated, ledgered pipeline</span></div>
 
       <div className="cards" style={{ marginTop: 14 }}>

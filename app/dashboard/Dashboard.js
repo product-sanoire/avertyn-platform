@@ -452,7 +452,7 @@ export default function Dashboard() {
         <div style={{ flex: 1, overflow: "auto", padding: "22px 26px" }}>
           <div className="shead">
             <div className="stitle">
-              <h1>Intelligence</h1>
+              <h1>Your leverage</h1>
               <span className="sub">{intel === "exposure"
                 ? "What IDR is costing each plan sponsor — the view your brokers distribute"
                 : "Who's filing against your plans, how weak their filings are, and how each IDRE behaves — your negotiation leverage"}</span>
@@ -684,7 +684,7 @@ function CommandCenter({ metrics, score, awardsM, agentM, scorecard, gap, onVeri
   const settled = score?.avg_settled_pct_of_demand;
   return (
     <div>
-      <div className="dh"><h1>Overview</h1><span className="sub">Meridian Plan Administrators · all plans</span></div>
+      <div className="dh"><h1>Where you stand</h1><span className="sub">All plans · H1 2026</span></div>
 
       <div className="bento">
         <div className="feat">
@@ -1102,3 +1102,4 @@ function DocModal({ doc, onClose }) {
     </div>
   );
 }
+                                                                                                                                                                       
