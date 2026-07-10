@@ -235,9 +235,9 @@ function Field({ l, wide, children }) {
 const CPI_BASE_YEAR = 2019;
 function QpaIndexView({ onErr }) {
   const [rows, setRows] = useState([]);
-  const [edits, setEdits] = useState({});   // year -> { index_value?, estimated? }
+  const [edits, setEdits] = useState({});   // year -> { index_value?, estimated?, cms_factor?, cms_source? }
   const [busy, setBusy] = useState("");
-  const [nu, setNu] = useState({ year: "", index_value: "", estimated: true });
+  const [nu, setNu] = useState({ year: "", index_value: "", estimated: true, cms_factor: "", cms_source: "" });
 
   const load = useCallback(async () => {
     try { const { data, error } = await supabase.rpc("list_cpi_u"); if (error) throw error; setRows(data || []); setEdits({}); }
@@ -249,13 +249,17 @@ function QpaIndexView({ onErr }) {
   const setEdit = (year, k, v) => setEdits((e) => ({ ...e, [year]: { ...(e[year] || {}), [k]: v } }));
   const valOf = (r) => (edits[r.year]?.index_value !== undefined ? edits[r.year].index_value : r.index_value);
   const estOf = (r) => (edits[r.year]?.estimated !== undefined ? edits[r.year].estimated : r.estimated);
-  const dirty = (r) => edits[r.year] && (Number(valOf(r)) !== Number(r.index_value) || !!estOf(r) !== !!r.estimated);
+  const cmsOf = (r) => (edits[r.year]?.cms_factor !== undefined ? edits[r.year].cms_factor : (r.cms_factor ?? ""));
+  const srcOf = (r) => (edits[r.year]?.cms_source !== undefined ? edits[r.year].cms_source : (r.cms_source ?? ""));
+  const dirty = (r) => edits[r.year] && (Number(valOf(r)) !== Number(r.index_value) || !!estOf(r) !== !!r.estimated
+    || String(cmsOf(r)) !== String(r.cms_factor ?? "") || String(srcOf(r)) !== String(r.cms_source ?? ""));
 
   async function save(year) {
     const r = rows.find((x) => x.year === year);
     setBusy("s" + year);
     try {
-      const { error } = await supabase.rpc("set_cpi_u", { p_year: year, p_index: Number(valOf(r)), p_estimated: !!estOf(r) });
+      const cf = cmsOf(r); const cms = cf === "" || cf == null ? null : Number(cf);
+      const { error } = await supabase.rpc("set_cpi_u", { p_year: year, p_index: Number(valOf(r)), p_estimated: !!estOf(r), p_cms_factor: cms, p_cms_source: srcOf(r) || null });
       if (error) throw error; await load();
     } catch (e) { onErr(e.message); }
     setBusy("");
@@ -264,8 +268,9 @@ function QpaIndexView({ onErr }) {
     if (!nu.year || !nu.index_value) return;
     setBusy("add");
     try {
-      const { error } = await supabase.rpc("set_cpi_u", { p_year: Number(nu.year), p_index: Number(nu.index_value), p_estimated: !!nu.estimated });
-      if (error) throw error; setNu({ year: "", index_value: "", estimated: true }); await load();
+      const cms = nu.cms_factor === "" ? null : Number(nu.cms_factor);
+      const { error } = await supabase.rpc("set_cpi_u", { p_year: Number(nu.year), p_index: Number(nu.index_value), p_estimated: !!nu.estimated, p_cms_factor: cms, p_cms_source: nu.cms_source || null });
+      if (error) throw error; setNu({ year: "", index_value: "", estimated: true, cms_factor: "", cms_source: "" }); await load();
     } catch (e) { onErr(e.message); }
     setBusy("");
   }
@@ -278,34 +283,48 @@ function QpaIndexView({ onErr }) {
   return (
     <div>
       <div className="panel">
-        <div className="ph">CPI-U index &amp; trend factors
-          <span className="act"><span className="muted" style={{ fontSize: 11 }}>base year {CPI_BASE_YEAR} · trend factor = index ÷ {CPI_BASE_YEAR} index</span></span>
+        <div className="ph">QPA indexing factors
+          <span className="act"><span className="muted" style={{ fontSize: 11 }}>base year {CPI_BASE_YEAR} · CMS official factor is authoritative when present</span></span>
         </div>
         <div className="pb" style={{ paddingTop: 12 }}>
           <p className="muted" style={{ fontSize: 12, margin: "0 0 12px" }}>
-            The QPA calculator multiplies the median 2019 contracted rate by these factors to trend it to a claim&apos;s service year
-            (45 CFR 149.140). Values marked <b>estimated</b> are placeholders for years BLS hasn&apos;t published — replace them with the
-            official annual average when it&apos;s released.
+            The QPA calculator trends the median 2019 contracted rate to a claim&apos;s service year (45 CFR 149.140). When a
+            <b> CMS-published factor</b> exists for that year (IRS notices), the calculator uses it as the defensible figure and
+            reconciles it against the internal <b>CPI-U estimate</b> (BLS annual-average index ÷ {CPI_BASE_YEAR}). Edit either here;
+            values marked <b>estimated</b> are provisional until BLS/CMS finalize them.
           </p>
           {rows.length === 0 ? <p className="muted">Loading…</p> : (
             <table>
-              <thead><tr><th>Year</th><th>CPI-U index</th><th>Trend × vs {CPI_BASE_YEAR}</th><th>Estimated</th><th></th></tr></thead>
+              <thead><tr><th>Year</th><th>CPI-U index</th><th>Est. ×</th><th>CMS factor (official)</th><th>Source</th><th>Δ</th><th>Est.</th><th></th></tr></thead>
               <tbody>
                 {rows.map((r) => {
                   const factor = base ? (Number(valOf(r)) / base) : null;
+                  const cf = cmsOf(r) === "" || cmsOf(r) == null ? null : Number(cmsOf(r));
+                  const delta = (factor != null && cf != null) ? (factor - cf) : null;
                   const isBase = r.year === CPI_BASE_YEAR;
                   return (
                     <tr key={r.year}>
                       <td><b>{r.year}</b>{isBase && <span className="badge b-ink" style={{ marginLeft: 8 }}>base</span>}</td>
                       <td>
                         <input type="number" step="0.001" value={valOf(r)} onChange={(e) => setEdit(r.year, "index_value", e.target.value)}
-                          style={{ width: 110, padding: "6px 9px", border: "1px solid var(--line)", borderRadius: 8, font: "inherit", fontSize: 12.5 }} />
+                          style={{ width: 96, padding: "6px 9px", border: "1px solid var(--line)", borderRadius: 8, font: "inherit", fontSize: 12.5 }} />
                       </td>
-                      <td className="mono" style={{ fontSize: 12.5 }}>{factor != null ? "×" + factor.toFixed(5) : "—"}</td>
+                      <td className="mono" style={{ fontSize: 12 }}>{factor != null ? "×" + factor.toFixed(5) : "—"}</td>
                       <td>
-                        <label style={{ display: "inline-flex", gap: 6, alignItems: "center", fontSize: 12, color: "var(--mut)" }}>
+                        <input type="number" step="0.0000000001" placeholder="—" value={cmsOf(r)} onChange={(e) => setEdit(r.year, "cms_factor", e.target.value)}
+                          style={{ width: 128, padding: "6px 9px", border: "1px solid var(--line)", borderRadius: 8, font: "inherit", fontSize: 12.5 }} />
+                      </td>
+                      <td>
+                        <input placeholder="IRS notice…" value={srcOf(r)} onChange={(e) => setEdit(r.year, "cms_source", e.target.value)}
+                          style={{ width: 150, padding: "6px 9px", border: "1px solid var(--line)", borderRadius: 8, font: "inherit", fontSize: 11.5 }} />
+                      </td>
+                      <td className="mono" style={{ fontSize: 11.5, color: delta != null && Math.abs(delta) >= 0.0005 ? "var(--sig,#a8321f)" : "var(--mut)" }}>
+                        {delta != null ? (delta > 0 ? "+" : "") + delta.toFixed(4) : "—"}
+                      </td>
+                      <td>
+                        <label style={{ display: "inline-flex", gap: 5, alignItems: "center", fontSize: 12, color: "var(--mut)" }}>
                           <input type="checkbox" checked={!!estOf(r)} onChange={(e) => setEdit(r.year, "estimated", e.target.checked)} />
-                          {estOf(r) ? <span className="badge b-amber">estimated</span> : <span className="badge b-green">published</span>}
+                          {estOf(r) ? <span className="badge b-amber">est.</span> : <span className="badge b-green">pub.</span>}
                         </label>
                       </td>
                       <td style={{ display: "flex", gap: 6 }}>
@@ -320,8 +339,10 @@ function QpaIndexView({ onErr }) {
           )}
           <div style={{ display: "flex", gap: 8, alignItems: "center", marginTop: 14, flexWrap: "wrap" }}>
             <span className="rlabel" style={{ margin: 0 }}>Add a year</span>
-            <input type="number" placeholder="Year" value={nu.year} onChange={(e) => setNu({ ...nu, year: e.target.value })} style={{ width: 90, padding: "7px 10px", border: "1px solid var(--line)", borderRadius: 8, font: "inherit", fontSize: 12.5 }} />
-            <input type="number" step="0.001" placeholder="CPI-U index" value={nu.index_value} onChange={(e) => setNu({ ...nu, index_value: e.target.value })} style={{ width: 120, padding: "7px 10px", border: "1px solid var(--line)", borderRadius: 8, font: "inherit", fontSize: 12.5 }} />
+            <input type="number" placeholder="Year" value={nu.year} onChange={(e) => setNu({ ...nu, year: e.target.value })} style={{ width: 80, padding: "7px 10px", border: "1px solid var(--line)", borderRadius: 8, font: "inherit", fontSize: 12.5 }} />
+            <input type="number" step="0.001" placeholder="CPI-U index" value={nu.index_value} onChange={(e) => setNu({ ...nu, index_value: e.target.value })} style={{ width: 110, padding: "7px 10px", border: "1px solid var(--line)", borderRadius: 8, font: "inherit", fontSize: 12.5 }} />
+            <input type="number" step="0.0000000001" placeholder="CMS factor (opt.)" value={nu.cms_factor} onChange={(e) => setNu({ ...nu, cms_factor: e.target.value })} style={{ width: 130, padding: "7px 10px", border: "1px solid var(--line)", borderRadius: 8, font: "inherit", fontSize: 12.5 }} />
+            <input placeholder="Source (opt.)" value={nu.cms_source} onChange={(e) => setNu({ ...nu, cms_source: e.target.value })} style={{ width: 130, padding: "7px 10px", border: "1px solid var(--line)", borderRadius: 8, font: "inherit", fontSize: 11.5 }} />
             <label style={{ display: "inline-flex", gap: 6, alignItems: "center", fontSize: 12, color: "var(--mut)" }}>
               <input type="checkbox" checked={nu.estimated} onChange={(e) => setNu({ ...nu, estimated: e.target.checked })} />estimated
             </label>

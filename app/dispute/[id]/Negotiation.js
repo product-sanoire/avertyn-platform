@@ -159,10 +159,33 @@ export default function Negotiation({ dispute, onChanged }) {
         <button className="btn btn-a" disabled={busy === "compute" || rates.length === 0} onClick={computeQpa} style={{ padding: "8px 14px", marginLeft: "auto" }}>{busy === "compute" ? "Computing…" : "Compute QPA →"}</button>
       </div>
       {calc?.ok && (
-        <p className="muted" style={{ fontSize: 11.5, margin: "2px 0 6px", lineHeight: 1.5 }}>
-          {calc.methodology}
-          {calc.index_year !== calc.service_year && <span> · CPI-U for {calc.service_year} not on file; used {calc.index_year}.</span>}
-        </p>
+        <div style={{ background: "var(--sunk,#f1eee9)", borderRadius: 10, padding: "10px 12px", margin: "4px 0 8px" }}>
+          <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+            <span className={"badge b-" + (calc.basis === "cms" ? "green" : "amber")}><i className={"dot d-" + (calc.basis === "cms" ? "green" : "amber")} />{calc.basis === "cms" ? "CMS-published factor · defensible" : "CPI-U estimate"}</span>
+            <b className="mono">QPA {money(calc.qpa)}</b>
+          </div>
+          <div style={{ display: "flex", gap: 18, flexWrap: "wrap", marginTop: 8 }}>
+            {calc.cms_factor != null && (
+              <div>
+                <div className="muted" style={{ fontSize: 10, textTransform: "uppercase", letterSpacing: ".05em" }}>CMS {calc.service_year} official</div>
+                <div><b className="mono">{money(calc.cms_qpa)}</b> <span className="muted mono" style={{ fontSize: 11.5 }}>×{Number(calc.cms_factor).toFixed(7)}</span></div>
+                {calc.cms_source && <div className="muted" style={{ fontSize: 10.5 }}>{calc.cms_source}</div>}
+              </div>
+            )}
+            <div>
+              <div className="muted" style={{ fontSize: 10, textTransform: "uppercase", letterSpacing: ".05em" }}>CPI-U estimate</div>
+              <div><b className="mono">{money(calc.cpi_qpa)}</b> <span className="muted mono" style={{ fontSize: 11.5 }}>×{Number(calc.cpi_factor).toFixed(5)}</span></div>
+            </div>
+            {calc.delta != null && (
+              <div>
+                <div className="muted" style={{ fontSize: 10, textTransform: "uppercase", letterSpacing: ".05em" }}>Reconciliation Δ</div>
+                <div><b className="mono" style={{ color: Math.abs(Number(calc.delta)) >= 0.01 ? "var(--sig,#a8321f)" : "var(--ok,#2e6b4c)" }}>{Number(calc.delta) > 0 ? "+" : ""}{money(calc.delta)}</b> <span className="muted" style={{ fontSize: 11 }}>CPI-U vs CMS</span></div>
+              </div>
+            )}
+          </div>
+          {calc.cms_factor == null && <div className="muted" style={{ fontSize: 11, marginTop: 6 }}>No CMS-published factor on file for {calc.service_year} — using the CPI-U estimate. Add the official factor under Admin → QPA index.</div>}
+          {calc.index_year !== calc.service_year && <div className="muted" style={{ fontSize: 11, marginTop: 4 }}>CPI-U for {calc.service_year} not on file; used {calc.index_year}.</div>}
+        </div>
       )}
 
       {/* ---- Offer ladder ---- */}
