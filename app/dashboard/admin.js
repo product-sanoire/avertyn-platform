@@ -5,6 +5,7 @@
 //   • Integrations — the eligibility pre-screen API (reused Tier-A view)
 import { useEffect, useState, useCallback } from "react";
 import { ApiKeysView } from "./ApiKeys";
+import { CeilingsView } from "./ceilings";
 import { supabase } from "../../lib/supabaseClient";
 import { useLive } from "../../lib/useLive";
 import { IntegrationsView, DeadlinesView } from "./tiera";
@@ -14,7 +15,7 @@ const METRICS = [["count", "Dispute count"], ["defended", "Dollars defended"], [
 const DIMS = [["initiator", "Initiator"], ["plan", "Plan"], ["state", "Workflow state"], ["cpt", "CPT"], ["month", "Month"]];
 const CADENCE = ["hourly", "daily", "weekly", "monthly"];
 const SCIM_BASE = (process.env.NEXT_PUBLIC_SUPABASE_URL || "https://ssjougrsaecdwfuxeasd.supabase.co") + "/functions/v1/scim";
-const ADMIN = [["access", "Access"], ["reports", "Reports"], ["model", "Model"], ["audit", "Audit"], ["alerts", "Alerts"], ["qpa", "QPA index"], ["integrations", "Integrations"], ["api", "API"], ["webhooks", "Webhooks"]];
+const ADMIN = [["access", "Access"], ["reports", "Reports"], ["model", "Model"], ["audit", "Audit"], ["alerts", "Alerts"], ["qpa", "QPA index"], ["ceilings", "Ceilings"], ["integrations", "Integrations"], ["api", "API"], ["webhooks", "Webhooks"]];
 
 async function sha256Hex(s) {
   const b = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(s));
@@ -46,6 +47,7 @@ export function AdminView({ orgId, onErr }) {
         : seg === "audit" ? <AuditView orgId={orgId} onErr={onErr} />
         : seg === "alerts" ? <DeadlinesView orgId={orgId} onErr={onErr} embedded />
         : seg === "qpa" ? <QpaIndexView onErr={onErr} />
+        : seg === "ceilings" ? <CeilingsView orgId={orgId} onErr={onErr} />
         : seg === "integrations" ? <IntegrationsView onErr={onErr} embedded />
         : <ApiKeysView onErr={onErr} />}
     </div>
