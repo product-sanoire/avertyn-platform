@@ -212,7 +212,7 @@ export default function Dashboard() {
   useEffect(() => {
     if (typeof window === "undefined") return;
     const p = new URLSearchParams(window.location.search);
-    const map = { overview: 0, cases: 1, intelligence: 2, workspace: 3, filing: 4, admin: 5 };
+    const map = { overview: 0, cases: 1, workspace: 2, intelligence: 3, filing: 4, admin: 5 };
     const t = p.get("tab");
     if (t && map[t] != null) setTab(map[t]);
     if (p.get("open") === "import") setImportOpen(true);
@@ -449,7 +449,7 @@ export default function Dashboard() {
             briefCounts={briefCounts} onPickBrief={pickBrief} onExportFiled={exportFiledBriefs} />
           <PredictionsView embedded onErr={setErr} onOpen={(id) => { setSel(id); setTab(1); setStage("all"); }} />
         </div>
-      ) : tab === 2 ? (
+      ) : tab === 3 ? (
         <div style={{ flex: 1, overflow: "auto", padding: "22px 26px" }}>
           <div className="shead">
             <div className="stitle">
@@ -468,7 +468,7 @@ export default function Dashboard() {
             : intel === "live" ? <LiveIntelligenceView orgId={orgId} onErr={setErr} embedded />
             : <InitiatorsView orgId={orgId} onErr={setErr} embedded />}
         </div>
-      ) : tab === 3 ? (
+      ) : tab === 2 ? (
         <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "auto", minHeight: 0 }}>
           <WorkspaceHub email={email} orgId={orgId} userId={userId} onErr={setErr} />
         </div>
@@ -1107,4 +1107,3 @@ function DocModal({ doc, onClose }) {
     </div>
   );
 }
-                                                                                                                                                                       
