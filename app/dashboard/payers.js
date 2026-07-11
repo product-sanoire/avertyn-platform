@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useState, useCallback } from "react";
 import { supabase } from "../../lib/supabaseClient";
+import PayerDetail from "./PayerDetail";
 
 function money(n) { return n == null ? "—" : "$" + Number(n).toLocaleString("en-US", { maximumFractionDigits: 0 }); }
 function pct(n) { return n == null ? "—" : Math.round(Number(n) * 100) + "%"; }
@@ -28,6 +29,7 @@ export function PayersView({ orgId, onErr, onOpenCase }) {
   const [open, setOpen] = useState(null);        // expanded plan_id
   const [cases, setCases] = useState({});        // plan_id -> case list
   const [busy, setBusy] = useState("");
+  const [detailPlan, setDetailPlan] = useState(null);
 
   const load = useCallback(async () => {
     try { const { data: d, error } = await supabase.rpc("payer_rollup"); if (error) throw error; setData(d); }
@@ -56,6 +58,7 @@ export function PayersView({ orgId, onErr, onOpenCase }) {
   }
 
   if (!data) return <p className="muted" style={{ padding: 24 }}>Loading payers…</p>;
+  if (detailPlan) return <PayerDetail planId={detailPlan} onBack={() => setDetailPlan(null)} onOpenCase={onOpenCase} />;
   const plans = data.plans || [];
   const gp = data.global_pct ?? 125;
   const tot = plans.reduce((a, p) => ({
@@ -172,6 +175,7 @@ export function PayersView({ orgId, onErr, onOpenCase }) {
                 {busy === "recompute" + p.plan_id ? "Working…" : "Recompute ceilings"}
               </button>
               <button className="mini" onClick={() => toggle(p.plan_id)}>{isOpen ? "Hide cases" : "View " + p.open_cases + " cases"}</button>
+              <button className="mini" onClick={() => setDetailPlan(p.plan_id)}>Open account →</button>
               <span className="muted" style={{ fontSize: 11.5, marginLeft: "auto" }}>Set this plan&rsquo;s greenlit ceiling in Admin &rsquo; Ceilings</span>
             </div>
 
