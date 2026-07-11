@@ -907,7 +907,7 @@ function Detail({ dd, onRun, onDoc, onOpenNeg, onAction, onStageMoney, onView, o
         <div className="panel"><div className="ph">QPA defense</div><div className="pb">
           <Bar l="Demand" v={d.demand_amount} max={d.demand_amount} c="var(--sig)" />
           <Bar l="Plan QPA" v={qpa.plan_qpa} max={d.demand_amount} c="var(--ink)" showref />
-          <Bar l="FAIR Health median" v={qpa.benchmark_fairhealth} max={d.demand_amount} c="var(--c-teal)" />
+          <Bar l="Regional median" v={qpa.benchmark_regional} max={d.demand_amount} c="var(--c-teal)" />
           <Bar l="Defensible ceiling" v={qpa.defensible_ceiling} max={d.demand_amount} c="var(--c-sage)" />
           {qpa.notes && <p className="muted" style={{ fontSize: 12 }}>{qpa.notes}</p>}
         </div></div>
@@ -924,8 +924,8 @@ function Detail({ dd, onRun, onDoc, onOpenNeg, onAction, onStageMoney, onView, o
         <div className="pb">
           {(() => {
             const qpaAmt = Number(d.qpa_amount || 0);
-            const fh = Number(qpa?.benchmark_fairhealth || 0);
-            const bench = fh > 0 ? { v: fh, short: "FAIR Health" } : (qpa?.defensible_ceiling ? { v: Number(qpa.defensible_ceiling), short: "ceiling" } : null);
+            const fh = Number(qpa?.benchmark_regional || 0);
+            const bench = fh > 0 ? { v: fh, short: "Regional" } : (qpa?.defensible_ceiling ? { v: Number(qpa.defensible_ceiling), short: "ceiling" } : null);
             if (!offers || offers.length === 0) return <p className="muted">No offers yet. Open a negotiation to settle at ~125% of QPA before any IDR fee — the cheapest win.</p>;
             return (<>
               {bench && <div className="muted" style={{ fontSize: 11.5, marginBottom: 6 }}>Benchmarked against QPA {money(qpaAmt)} · {bench.short} {money(bench.v)}.</div>}

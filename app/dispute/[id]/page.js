@@ -149,7 +149,7 @@ export default function CaseWorkspace() {
             <div>
               <Bar label="Demand" val={d.demand_amount} max={d.demand_amount} color="var(--red)" />
               <Bar label="Plan QPA" val={qpa.plan_qpa} max={d.demand_amount} color="var(--ind)" />
-              <Bar label="FAIR Health median" val={qpa.benchmark_fairhealth} max={d.demand_amount} color="var(--gold)" />
+              <Bar label="Regional median" val={qpa.benchmark_regional} max={d.demand_amount} color="var(--gold)" />
               <Bar label="Defensible ceiling" val={qpa.defensible_ceiling} max={d.demand_amount} color="var(--navy)" />
               {qpa.notes && <p className="muted" style={{ fontSize: 13 }}>{qpa.notes}</p>}
             </div>

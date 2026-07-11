@@ -25,7 +25,7 @@ export default function Negotiation({ dispute, onChanged }) {
 
   const [rates, setRates] = useState([]);
   const [offers, setOffers] = useState([]);
-  const [qpaRec, setQpaRec] = useState(null);   // qpa_records: FAIR Health median, defensible ceiling
+  const [qpaRec, setQpaRec] = useState(null);   // qpa_records: regional median, defensible ceiling
   const [err, setErr] = useState("");
   const [busy, setBusy] = useState("");
   const [calc, setCalc] = useState(null);
@@ -38,18 +38,18 @@ export default function Negotiation({ dispute, onChanged }) {
       const [{ data: r, error: e1 }, { data: o, error: e2 }, { data: qr }] = await Promise.all([
         supabase.rpc("list_qpa_rates", { p_dispute: disputeId }),
         supabase.from("offers").select("id, party, kind, amount, pct_of_qpa, round_no, status, note, submitted_at").eq("dispute_id", disputeId).order("round_no", { ascending: true }),
-        supabase.from("qpa_records").select("benchmark_fairhealth, defensible_ceiling").eq("dispute_id", disputeId).maybeSingle(),
+        supabase.from("qpa_records").select("benchmark_regional, defensible_ceiling").eq("dispute_id", disputeId).maybeSingle(),
       ]);
       if (e1) throw e1; if (e2) throw e2;
       setRates(r || []); setOffers(o || []); setQpaRec(qr || null);
     } catch (e) { setErr(e.message || String(e)); }
   }, [disputeId]);
 
-  // Independent benchmark each offer is measured against: FAIR Health median,
+  // Independent benchmark each offer is measured against: regional median,
   // falling back to the defensible ceiling.
   const bench = (() => {
-    const fh = Number(qpaRec?.benchmark_fairhealth || 0);
-    if (fh > 0) return { v: fh, label: "FAIR Health median", short: "FAIR Health" };
+    const fh = Number(qpaRec?.benchmark_regional || 0);
+    if (fh > 0) return { v: fh, label: "Regional median", short: "Regional" };
     const dc = Number(qpaRec?.defensible_ceiling || 0) || ceiling;
     return dc > 0 ? { v: dc, label: "defensible ceiling", short: "ceiling" } : null;
   })();
