@@ -5,6 +5,7 @@ import { supabase } from "../../lib/supabaseClient";
 import { money, untilLabel, caseIdentity } from "../../lib/format";
 import { PredictionsView } from "./ops";
 import { WorkspaceHub } from "./workspace";
+import { CasesSurface } from "./cases";
 import { InitiatorsView } from "./tiera";
 import { LiveIntelligenceView } from "./intel";
 import { ImportHub } from "./import";
@@ -305,6 +306,20 @@ export default function Dashboard() {
   }
   // Build a batch from the selected cases and jump to Filing (batch → IDRE → file).
   const batchAndFile = () => batchFileIds(selected);
+  // Bulk run over an explicit id list (used by the Ledger's bulk bar).
+  async function runBulkIds(ids, kind) {
+    const list = Array.from(ids || []);
+    if (!list.length) return;
+    setBusy("bulk"); setErr("");
+    try {
+      for (const id of list) {
+        if (kind === "predict") await rpc("execute_action", { p_action: "predict_outcome", p_dispute: id, p_params: {}, p_actor: email, p_rationale: "Bulk predict" });
+        else await rpc("run_eligibility", { p_dispute: id });
+      }
+      await loadShell(); if (sel) await loadDetail(sel);
+    } catch (e) { setErr(e.message || "Bulk action failed."); }
+    setBusy("");
+  }
 
   const runEngine = () => act("engine", () => rpc("run_eligibility", { p_dispute: sel }));
   const runAutopilot = () => act("auto", () => orgId && rpc("bavert_tick_all", { p_org: orgId }));
@@ -507,173 +522,20 @@ export default function Dashboard() {
         </div>
       ) : (
         <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}>
-          <div style={{ padding: "16px 24px 12px", display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
-            <h1 className="vh">Cases</h1>
-            <div className="seg">
-              {STAGES.map(([k, label]) => (
-                <button key={k} className={stage === k ? "on" : ""} onClick={() => setStage(k)}>{label}</button>
-              ))}
-            </div>
-            <div className="seg" title="Filter by case phase">
-              <button className={phaseFilter === "all" ? "on" : ""} onClick={() => setPhaseFilter("all")}>All phases</button>
-              <button className={phaseFilter === "open_negotiation" ? "on" : ""} onClick={() => setPhaseFilter("open_negotiation")}>Open neg. ({phaseCounts.open_negotiation || 0})</button>
-              <button className={phaseFilter === "idr" ? "on" : ""} onClick={() => setPhaseFilter("idr")}>IDR ({phaseCounts.idr || 0})</button>
-            </div>
-            {selected.size > 0 && (
-              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                <span className="badge b-ink">{selected.size} selected</span>
-                <button className="mini" disabled={busy === "bulk"} onClick={() => runBulk((id) => rpc("run_eligibility", { p_dispute: id }))}>{busy === "bulk" ? "Working…" : "Run engine"}</button>
-                <button className="mini" disabled={busy === "bulk"} onClick={() => runBulk((id) => rpc("execute_action", { p_action: "predict_outcome", p_dispute: id, p_params: {}, p_actor: email, p_rationale: "Bulk predict" }))}>Predict</button>
-                <button className="mini" disabled={busy === "bulk"} onClick={batchAndFile}>Batch &amp; file →</button>
-                <button className="mini" onClick={() => setSelected(new Set())}>Clear</button>
-              </div>
-            )}
-            <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 9 }}>
-              <input value={dispQuery} onChange={(e) => setDispQuery(e.target.value)} placeholder="Filter…"
-                style={{ padding: "8px 12px", border: 0, borderRadius: 9, background: "var(--sunk)", boxShadow: "inset 0 0 0 1px var(--line)", font: "inherit", fontSize: 12.5, width: 150 }} />
-              <select className="dsel" value={briefFilter} onChange={(e) => setBriefFilter(e.target.value)} style={{ padding: "8px 10px" }}
-                title="Filter cases by their furthest-along brief status">
-                <option value="all">Brief: all</option>
-                <option value="draft">Brief: draft</option>
-                <option value="in_review">Brief: in review</option>
-                <option value="approved">Brief: approved</option>
-                <option value="filed">Brief: filed</option>
-                <option value="sealed">Brief: sealed</option>
-                <option value="none">Brief: none yet</option>
-              </select>
-              <select className="dsel" value={dispSort} onChange={(e) => setDispSort(e.target.value)} style={{ padding: "8px 10px" }}>
-                <option value="deadline">Sort: deadline</option>
-                <option value="demand">Sort: demand</option>
-                <option value="score">Sort: ineligibility</option>
-                <option value="brief">Sort: brief status</option>
-              </select>
-              {briefFilter !== "all" && (
-                <button className="mini" onClick={() => setBriefFilter("all")} title="Clear brief-status filter">✕ brief</button>
-              )}
-              <span className="muted" style={{ fontSize: 12.5 }}>{displayed.length}</span>
-              <button className="mini" onClick={() => downloadCSV("avertyn-disputes.csv", displayed, DISPUTE_CSV_COLS)}>Export CSV</button>
-            </div>
-          </div>
-          <div className={"work" + (listOpen ? "" : " list-collapsed") + (railOpen ? "" : " rail-collapsed")} style={{ flex: 1 }}>
-          <div className={"list" + (listOpen ? "" : " collapsed")}>
-            {listOpen ? (<>
-            <div className="lhdr"><b>{tabHeader}</b><span className="ct">{displayed.length}</span>
-              <button className="pane-toggle" title="Collapse case list" aria-label="Collapse case list" onClick={() => setListOpen(false)}>«</button>
-            </div>
-            {displayed.length === 0
-              ? <p className="muted" style={{ padding: 16 }}>Nothing here right now.</p>
-              : displayed.map((r) => {
-                  const rd = read(r);
-                  const isSel = selected.has(r.id);
-                  return (
-                    <div key={r.id} className={"lrow" + (r.id === sel ? " on" : "")} onClick={() => setSel(r.id)}>
-                      <div className="r1">
-                        <label style={{ display: "flex", alignItems: "center", gap: 8 }} onClick={(e) => e.stopPropagation()}>
-                          <input type="checkbox" checked={isSel} onChange={(e) => { const n = new Set(selected); e.target.checked ? n.add(r.id) : n.delete(r.id); setSelected(n); }} />
-                          <b>{caseIdentity(r).number}</b>
-                        </label>
-                        <span className="badge"><i className={"dot d-" + rd.tone} />{rd.label}</span>
-                        {(() => { const t = r.respond_by || r.pay_by; if (!t) return null; const h = (new Date(t).getTime() - Date.now()) / 3.6e6; if (h > 168) return null; const od = h < 0; return <span className={"badge " + (od ? "b-red" : h <= 72 ? "b-amber" : "b-grey")} style={{ marginLeft: "auto" }} title="Response / payment window"><i className={"dot d-" + (od ? "red" : h <= 72 ? "amber" : "grey")} />{untilLabel(t)}</span>; })()}
-                      </div>
-                      <div className="r2" style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-                        <span>{r.initiators?.name || "—"} · {money(r.demand_amount)} · {r.workflow_state}</span>
-                        {(() => { const idr = phaseOf(r) === "idr"; const ci = caseIdentity(r); return (
-                          <>
-                            <span className={"badge b-" + (idr ? "green" : "amber")} title={idr ? "Federal IDR" : "Open negotiation"}>
-                              <i className={"dot d-" + (idr ? "green" : "amber")} />{idr ? "IDR" : "Open neg."}
-                            </span>
-                            {ci.internal && ci.isLegal && <span className="muted" style={{ fontSize: 11 }}>internal #{ci.internal}</span>}
-                          </>
-                        ); })()}
-                        {briefMap[r.id] && (
-                          <span className={"badge b-" + (DOC_STATUS_TONE[briefMap[r.id].status] || "grey")} title="Furthest-along brief status on this case">
-                            <i className={"dot d-" + (DOC_STATUS_TONE[briefMap[r.id].status] || "grey")} />
-                            {DOC_STATUS_LABEL[briefMap[r.id].status] || "Draft"}
-                          </span>
-                        )}
-                        {briefMap[r.id]?.sealed && <span className="badge b-green" title="A document on this case is signed &amp; sealed"><i className="dot d-green" />Sealed</span>}
-                        {negMap[r.id] && (
-                          <span className={"badge b-" + (negMap[r.id].last_party === "plan" ? "ind" : "amber")}
-                            title={`Latest offer: ${negMap[r.id].last_party === "plan" ? "plan" : "provider"} · ${money(negMap[r.id].last_amount)} · round ${negMap[r.id].rounds}`}>
-                            <i className={"dot d-" + (negMap[r.id].last_party === "plan" ? "ind" : "amber")} />
-                            {negMap[r.id].last_pct != null ? Math.round(negMap[r.id].last_pct) + "% QPA" : money(negMap[r.id].last_amount)}
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                  );
-                })}
-            </>) : (
-              <button className="pane-reopen" title="Show case list" aria-label="Show case list" onClick={() => setListOpen(true)}><span className="chev">»</span><span className="vlabel">Cases</span></button>
-            )}
-          </div>
-          <div className="detail">
-            {detail && (
-              <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 10 }}>
-                <button className="mini" title={(listOpen || railOpen) ? "Collapse both panels for a full-width case" : "Restore both panels"}
-                  onClick={() => { const open = !(listOpen || railOpen); setListOpen(open); setRailOpen(open); }}>
-                  {(listOpen || railOpen) ? "↔ Full case" : "Exit full case"}
-                </button>
-              </div>
-            )}
-            {!detail ? <p className="muted">Select a dispute…</p> : <Detail dd={detail} onRun={runEngine} onDoc={genLetter} onOpenNeg={openNeg} onAction={caseAction} onStageMoney={stageMoney} onView={setDocView} onExplain={() => setExplainId(sel)} onChanged={() => { loadDetail(sel); loadShell(); }} busy={busy} />}
-          </div>
-          <div className={"rail" + (railOpen ? "" : " collapsed")}>
-            {railOpen ? (<>
-            <div className="rlabel" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
-              <span>Autopilot · governed</span>
-              <button className="pane-toggle" title="Collapse autopilot panel" aria-label="Collapse autopilot panel" onClick={() => setRailOpen(false)}>»</button>
-            </div>
-            <div className="rcard">
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                <b style={{ fontFamily: "var(--disp)", fontSize: 15 }}>Agent</b>
-                <button className="btn btn-s" style={{ padding: "6px 11px" }} disabled={busy === "auto"} onClick={runAutopilot}>{busy === "auto" ? "Running…" : "Run tick"}</button>
-              </div>
-              {metrics && <p className="muted" style={{ marginTop: 8 }}>{metrics.open_disputes} open · {money(metrics.dollars_defended)} defended · {metrics.challenges_filed} challenges</p>}
-            </div>
-
-            <div className="rlabel">Autonomy dial</div>
-            <div className="rcard" style={{ padding: "4px 13px" }}>
-              {autonomy.length === 0 ? <p className="muted" style={{ padding: "8px 0" }}>No policy set.</p> : autonomy.map((a) => (
-                <div key={a.action_type} className="dial">
-                  <span>{ACTION_LABEL[a.action_type] || a.action_type}</span>
-                  <select className="dsel" value={a.mode} disabled={busy === "dial" + a.action_type}
-                    onChange={(e) => setAutonomy_(a.action_type, e.target.value)}>
-                    {MODES.map((m) => <option key={m} value={m}>{m[0].toUpperCase() + m.slice(1)}</option>)}
-                  </select>
-                </div>
-              ))}
-            </div>
-
-            <div className="rlabel">Waiting for you · {queue.length}</div>
-            {queue.length === 0 ? <p className="muted">Nothing staged.</p> : queue.map((q) => {
-              const isMoney = MONEY.has(q.action_type);
-              return (
-                <div key={q.id} className="rcard">
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                    <b style={{ fontSize: 12 }}>{q.action_type} · {money(q.amount)}</b>
-                    <span className={"badge " + (isMoney ? "b-red" : "b-amber")}><i className={"dot d-" + (isMoney ? "red" : "amber")} />{isMoney ? "Dual-control" : "Review"}</span>
-                  </div>
-                  {q.rationale && <div className="muted" style={{ fontSize: 11, margin: "6px 0 9px" }}>{q.rationale}</div>}
-                  <div style={{ display: "flex", gap: 7 }}>
-                    {isMoney
-                      ? <button className="btn btn-a" style={{ padding: "7px 12px" }} disabled={busy === "rel" + q.id} onClick={() => setMoneyRel(q)}>Release · step-up</button>
-                      : <button className="btn btn-a" style={{ padding: "7px 12px" }} disabled={busy === "rel" + q.id} onClick={() => release(q.id)}>Release</button>}
-                    <button className="btn btn-s" style={{ padding: "7px 12px" }} disabled={busy === "rej" + q.id} onClick={() => reject(q.id)}>Reject</button>
-                  </div>
-                </div>
-              );
-            })}
-
-            <div className="rlabel">Agent activity · ledger</div>
-            <div className="rcard"><div className="feed">
-              {feed.map((e, i) => <div key={i}>{e.actor === "agent" ? "✦" : "•"} <b>{e.action_type}</b> · {e.actor}{e.rationale ? " — " + e.rationale.slice(0, 60) : ""}</div>)}
-            </div></div>
-            </>) : (
-              <button className="pane-reopen" title="Show autopilot panel" aria-label="Show autopilot panel" onClick={() => setRailOpen(true)}><span className="chev">«</span><span className="vlabel">Autopilot</span></button>
-            )}
-          </div>
-        </div>
+          <CasesSurface
+            rows={rows} briefMap={briefMap} negMap={negMap}
+            sel={sel} setSel={setSel} busy={busy}
+            detailLoaded={!!(detail && detail.d && detail.d.id === sel)}
+            queue={queue} autonomy={autonomy} feed={feed} metrics={metrics}
+            onRunBulk={(ids, kind) => runBulkIds(ids, kind)}
+            onBatchFile={(ids) => batchFileIds(ids)}
+            onRelease={release} onReject={reject} onMoneyRelease={setMoneyRel}
+            onSetAutonomy={setAutonomy_} onAutopilot={runAutopilot}
+            onExportCSV={() => downloadCSV("avertyn-disputes.csv", rows, DISPUTE_CSV_COLS)}
+            onExplain={(id) => setExplainId(id)}
+            renderDetail={() => (
+              <Detail dd={detail} onRun={runEngine} onDoc={genLetter} onOpenNeg={openNeg} onAction={caseAction} onStageMoney={stageMoney} onView={setDocView} onExplain={() => setExplainId(sel)} onChanged={() => { loadDetail(sel); loadShell(); }} busy={busy} />
+            )} />
         </div>
       )}
 

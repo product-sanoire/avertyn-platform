@@ -850,6 +850,105 @@ input,select,textarea{color:var(--ink);font-family:inherit}
 @media(max-width:1000px){.ws-lanes{grid-auto-flow:column;grid-template-columns:none;grid-auto-columns:minmax(200px,1fr)}}
 
 /* ============================================================
+   Cases surface — Ledger (default) · Case File · Command Deck.
+   ============================================================ */
+.cs-root{flex:1;display:flex;flex-direction:column;overflow:auto;min-height:0}
+.cs-bar{display:flex;align-items:flex-end;gap:14px;padding:16px 24px 12px}
+.cs-title{font-family:var(--disp);font-weight:500;font-size:23px;letter-spacing:-.02em;margin:0}
+.cs-sub{color:var(--mut);font-size:13px;margin-top:1px}
+.cs-seg{margin-left:auto;display:inline-flex;background:var(--sunk);border-radius:12px;padding:4px;gap:3px}
+.cs-seg button{font:inherit;font-weight:600;font-size:13px;color:var(--mut);border:0;background:transparent;padding:8px 15px;border-radius:9px;cursor:pointer;display:flex;align-items:center;gap:7px}
+.cs-seg button.on{background:var(--card);color:var(--ink);box-shadow:var(--sh-1)}
+.cs-bar .mini{margin-left:auto}
+.cs-segn{font-family:var(--num);font-size:10px;font-weight:700;background:var(--sig);color:#fff;border-radius:999px;padding:0 6px}
+/* segments */
+.cs-segbar{display:flex;align-items:center;gap:8px;padding:0 24px 12px;flex-wrap:wrap}
+.cs-chip{border:0;background:var(--card);box-shadow:var(--sh-1),inset 0 0 0 1px var(--line);color:var(--mut);font-size:12px;font-weight:600;padding:7px 12px;border-radius:var(--r-pill);display:flex;align-items:center;gap:7px;cursor:pointer}
+.cs-chip:hover{color:var(--ink)}
+.cs-chip.on{background:var(--ink);color:var(--onacc)}
+.cs-chip .c{font-family:var(--num);font-size:10px;opacity:.85}
+/* table */
+.cs-tblwrap{margin:0 24px 24px;background:var(--card);border-radius:var(--r-2);box-shadow:var(--sh-1);overflow:hidden}
+.cs-tbar{display:flex;align-items:center;gap:10px;padding:11px 16px;border-bottom:1px solid var(--hair);flex-wrap:wrap}
+.cs-tbar input{border:0;background:var(--sunk);border-radius:var(--r-pill);padding:8px 13px;box-shadow:inset 0 0 0 1px var(--line);font:inherit;font-size:12.5px;width:200px}
+.cs-tbar input:focus{outline:none;box-shadow:inset 0 0 0 1.5px var(--ink)}
+.cs-tbar-rt{margin-left:auto;display:flex;align-items:center;gap:9px;font-size:12px;color:var(--mut)}
+.cs-bulk{display:flex;align-items:center;gap:8px;background:#eae4d6;border-radius:var(--r-pill);padding:5px 6px 5px 13px}
+.cs-bulk .n{font-size:12px;font-weight:700;color:var(--ink)}
+.cs-tscroll{overflow-x:auto}
+.cs-table{width:100%;border-collapse:collapse;font-size:12.5px}
+.cs-table thead th{position:sticky;top:0;background:var(--card-2);text-align:left;font-size:10px;letter-spacing:.05em;text-transform:uppercase;color:var(--faint);font-weight:700;padding:10px 12px;cursor:pointer;white-space:nowrap;border-bottom:1px solid var(--line);user-select:none}
+.cs-table thead th:hover{color:var(--ink)}
+.cs-table thead th.num{text-align:right}
+.cs-table thead th .ar{opacity:.5;font-size:9px}
+.cs-table td{padding:10px 12px;border-bottom:1px solid var(--hair);white-space:nowrap;vertical-align:middle}
+.cs-table td.num{text-align:right;font-variant-numeric:tabular-nums}
+.cs-table tbody tr{cursor:pointer;transition:background var(--dur)}
+.cs-table tbody tr:hover{background:var(--card-2)}
+.cs-table tbody tr.sel{background:#eae4d6}
+.cs-cno{font-family:var(--num);font-weight:700;color:var(--ink);font-size:12px}
+.cs-cint{font-size:10px;color:var(--faint);font-family:var(--num)}
+.cs-bar-i,.cs-bar{display:inline-block;width:50px;height:6px;border-radius:6px;background:var(--sunk);overflow:hidden;vertical-align:middle;margin-right:7px}
+.cs-bar i{display:block;height:100%;border-radius:6px}
+.cs-ratio{font-family:var(--num);font-weight:700;font-size:11px;padding:2px 7px;border-radius:var(--r-pill)}
+.cs-ratio.hi{background:var(--sig-soft);color:var(--sig-ink)}.cs-ratio.mid{background:var(--warn-soft);color:var(--warn)}.cs-ratio.lo{background:var(--sunk);color:var(--mut)}
+.cs-cd{font-family:var(--num);font-size:11px;font-weight:700;padding:2px 8px;border-radius:var(--r-pill)}
+.cs-cd.cd-over{background:var(--sig);color:#fff}.cs-cd.cd-soon{background:var(--warn-soft);color:var(--warn)}.cs-cd.cd-ok{background:var(--sunk);color:var(--mut)}
+.cs-agflag{width:22px;height:22px;border-radius:6px;display:inline-grid;place-items:center;font-size:11px;background:var(--sig-soft);color:var(--sig-ink)}
+/* Case File */
+.cs-file{padding:0 24px 26px}
+.cs-filebar{display:flex;align-items:center;gap:10px;padding:0 0 12px}
+.cs-filegrid{display:grid;grid-template-columns:minmax(0,1fr) 288px;gap:18px;align-items:start}
+.cs-filemain{background:var(--card);border-radius:var(--r-2);box-shadow:var(--sh-1);padding:20px 24px;min-width:0}
+.cs-filerail{background:var(--card-2);border-radius:var(--r-2);box-shadow:var(--sh-1);padding:16px}
+/* Command Deck */
+.cs-deck{display:grid;grid-template-columns:330px minmax(0,1fr) 260px;gap:16px;padding:0 24px 26px;align-items:start}
+.cs-deckcol{background:var(--card);border-radius:var(--r-2);box-shadow:var(--sh-1);display:flex;flex-direction:column;max-height:calc(100vh - 240px)}
+.cs-colhd{display:flex;align-items:center;gap:9px;padding:14px 16px 10px;border-bottom:1px solid var(--hair)}
+.cs-colhd h3{margin:0;font-family:var(--disp);font-size:15px;font-weight:600}
+.cs-colhd .ct{margin-left:auto;font-family:var(--num);font-size:11px;color:var(--faint)}
+.cs-deckscroll{overflow:auto;padding:9px}
+.cs-glabel{font-size:9.5px;font-weight:700;letter-spacing:.11em;text-transform:uppercase;color:var(--faint);padding:9px 8px 6px;display:flex;align-items:center;gap:7px}
+.cs-dcard{border:1px solid var(--line);border-radius:12px;padding:11px 12px;margin-bottom:8px;cursor:pointer;transition:box-shadow var(--dur),border-color var(--dur);background:var(--card)}
+.cs-dcard:hover{box-shadow:var(--sh-1)}
+.cs-dcard.sel{border-color:var(--ink);box-shadow:var(--sh-2)}
+.cs-dcard.agent{background:linear-gradient(160deg,#fbf3ef,var(--card));border-color:var(--sig-line)}
+.cs-dcard .r1{display:flex;align-items:center;gap:7px}
+.cs-tico{width:22px;height:22px;border-radius:6px;display:grid;place-items:center;font-size:11px;flex:none;color:#fff}
+.cs-tico.approve{background:linear-gradient(150deg,#c14a2f,#7a2410)}.cs-tico.file{background:var(--sig)}.cs-tico.respond{background:var(--warn)}
+.cs-dcard .amt{margin-left:auto;font-family:var(--num);font-size:11.5px;font-weight:700}
+.cs-dcard .tt{font-size:13px;font-weight:600;margin-top:7px;line-height:1.3}
+.cs-dcard .sub{font-size:11px;color:var(--mut);margin-top:4px}
+.cs-decksurface{background:var(--card);border-radius:var(--r-2);box-shadow:var(--sh-1);padding:18px 20px;min-width:0;max-height:calc(100vh - 240px);overflow:auto}
+.cs-decision{background:linear-gradient(150deg,#fbf3ef,var(--card));border:1px solid var(--sig-line);border-radius:var(--r-2);padding:15px 17px;margin-bottom:16px}
+.cs-drk{font-size:9.5px;font-weight:700;letter-spacing:.13em;text-transform:uppercase;color:var(--sig-ink)}
+.cs-drv{font-family:var(--disp);font-size:19px;font-weight:600;margin:7px 0 3px}
+.cs-drr{font-size:13px;color:var(--ink-2);line-height:1.55}
+.cs-dacts{display:flex;gap:8px;flex-wrap:wrap;margin-top:13px}
+.cs-deckrail{background:var(--card);border-radius:var(--r-2);box-shadow:var(--sh-1);padding:16px;max-height:calc(100vh - 240px);overflow:auto}
+/* shared agent rail */
+.cs-agenthd{display:flex;align-items:center;gap:9px;margin-bottom:10px}
+.cs-agav{width:30px;height:30px;border-radius:9px;flex:none;display:grid;place-items:center;font-size:14px;color:#fff;background:linear-gradient(150deg,#c14a2f,#7a2410);box-shadow:0 0 0 3px var(--sig-soft)}
+.cs-agmeta{flex:1;min-width:0;line-height:1.2}.cs-agmeta b{font-family:var(--disp);font-size:13px;font-weight:600;display:block}.cs-agmeta span{font-size:10.5px;color:var(--faint)}
+.cs-agsub{font-size:9.5px;font-weight:700;letter-spacing:.13em;text-transform:uppercase;color:var(--faint);margin:16px 0 8px}
+.cs-pipe{display:flex;flex-direction:column;gap:6px}
+.cs-piperow{display:grid;grid-template-columns:92px 1fr 22px;gap:9px;align-items:center;font-size:11.5px}
+.cs-piperow .pl{color:var(--mut);font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cs-piperow .pipebar{height:7px;border-radius:6px;background:var(--sunk);overflow:hidden}
+.cs-piperow .pipebar i{display:block;height:100%;border-radius:6px;background:var(--idr)}
+.cs-piperow .pn{font-family:var(--num);font-size:11px;font-weight:700;text-align:right}
+.cs-app{background:linear-gradient(160deg,#fbf3ef,var(--card));border:1px solid var(--sig-line);border-radius:12px;padding:11px 12px;margin-bottom:8px}
+.cs-apphd{display:flex;align-items:center;justify-content:space-between;gap:8px}.cs-apphd b{font-size:12px}
+.cs-apprat{font-size:11px;color:var(--mut);line-height:1.5;margin:7px 0 9px}
+.cs-appacts{display:flex;gap:7px}
+.cs-dials{display:flex;flex-direction:column;gap:3px}
+.cs-dial{display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:12px;padding:4px 0}
+.cs-dial select{border:0;background:var(--sunk);border-radius:8px;padding:5px 8px;font-size:11.5px;font-weight:600;font-family:inherit;color:var(--ink)}
+.cs-astream{display:flex;flex-direction:column;gap:2px}
+.cs-aline{font-size:11px;color:var(--mut);line-height:1.65}.cs-aline b{color:var(--ink);font-weight:600}
+@media(max-width:1100px){.cs-filegrid{grid-template-columns:1fr}.cs-deck{grid-template-columns:1fr}.cs-deckcol,.cs-decksurface,.cs-deckrail{max-height:none}}
+
+/* ============================================================
    Minimal sub-tabs (Finish 2): small-caps, tracked, dot marker.
    Additive override of the .seg segmented control (previously a
    filled pill tray). Re-styles chrome only; markup + behavior
