@@ -1018,3 +1018,26 @@ input,select,textarea{color:var(--ink);font-family:inherit}
 .seg button:hover{color:var(--ink);background:none;box-shadow:none}
 .seg button.on{color:var(--ink);background:none;box-shadow:none}
 .seg button.on::after{content:"";position:absolute;left:50%;bottom:-1px;width:4px;height:4px;border-radius:50%;background:var(--sig);transform:translateX(-50%)}
+
+/* ============================================================
+   Unified control system (2026-07). Additive overrides so every
+   interactive control speaks ONE language across all screens:
+     Navigation (.tab primary, .seg section) = flat underline small-caps
+     Segmented toggles (.ws-seg, .cs-seg, .ws-scope) = one hairline control
+     Filter chips (.ws-fchip, .cs-chip) = ghost -> --sig-soft when active
+   Single accent (--sig) marks active everywhere; shared focus ring.
+   Placed last so it wins the cascade. Markup unchanged.
+   ============================================================ */
+.tabs{gap:24px;padding:0 22px}
+.tab{border-radius:0;background:none;box-shadow:none;color:var(--faint);font-size:11px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;padding:8px 2px;transition:color var(--dur)}
+.tab:hover{background:none;color:var(--ink)}
+.tab.on{background:none;box-shadow:none;color:var(--ink);font-weight:600}
+.tab.on::after{content:"";position:absolute;left:2px;right:2px;bottom:2px;height:2px;background:var(--sig);border-radius:2px}
+.ws-seg,.cs-seg,.ws-scope{background:var(--card-2);border:1px solid var(--line);box-shadow:none;border-radius:var(--r-1);padding:3px;gap:2px}
+.ws-seg button,.cs-seg button,.ws-scope button{font-size:11px;font-weight:600;letter-spacing:.10em;text-transform:uppercase;color:var(--mut);padding:6px 13px;border-radius:8px}
+.ws-seg button:hover,.cs-seg button:hover,.ws-scope button:hover{color:var(--ink)}
+.ws-seg button.on,.cs-seg button.on,.ws-scope button.on{background:var(--card);color:var(--ink);box-shadow:var(--sh-1)}
+.ws-fchip,.cs-chip{background:var(--card);border:1px solid var(--line);box-shadow:none;color:var(--mut);border-radius:var(--r-pill)}
+.ws-fchip:hover,.cs-chip:hover{color:var(--ink);border-color:var(--line-2)}
+.ws-fchip.on,.cs-chip.on{background:var(--sig-soft);color:var(--sig-ink);border-color:var(--sig-line)}
+.tab:focus-visible,.seg button:focus-visible,.ws-seg button:focus-visible,.cs-seg button:focus-visible,.ws-scope button:focus-visible,.ws-fchip:focus-visible,.cs-chip:focus-visible,.btn:focus-visible,.mini:focus-visible{outline:2px solid var(--sig-line);outline-offset:2px}
