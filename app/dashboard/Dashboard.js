@@ -16,7 +16,7 @@ import { GettingStarted } from "./GettingStarted";
 import { WorkspaceSwitcher } from "./WorkspaceSwitcher";
 import Claims from "../dispute/[id]/Claims";
 
-const TABS = ["Overview", "Cases", "Workspace", "Intelligence", "Filing", "Admin"];
+const TABS = ["Overview", "Cases", "Intelligence", "Workspace", "Filing", "Admin"];
 const INTEL = [["initiators", "Initiators & IDREs"], ["exposure", "Employer exposure"], ["live", "Live intelligence"]];
 const STAGES = [["all", "All"], ["due", "Due soon"], ["incoming", "Incoming"], ["eligibility", "Eligibility"], ["qpa", "QPA defense"], ["respond", "Respond & pay"]];
 const mkg = { pass: ["pass", "✓"], fail: ["fail", "×"], warn: ["warn", "!"], na: ["na", "–"] };
@@ -104,6 +104,18 @@ export default function Dashboard() {
   const [dispQuery, setDispQuery] = useState("");
   const [briefFilter, setBriefFilter] = useState("all");   // all | draft | in_review | approved | filed | sealed | none
   const [phaseFilter, setPhaseFilter] = useState("all");   // all | open_negotiation | idr
+  const [listOpen, setListOpen] = useState(true);          // left case-list rail collapse
+  const [railOpen, setRailOpen] = useState(true);          // right autopilot panel collapse
+  useEffect(() => {
+    try {
+      const s = JSON.parse(localStorage.getItem("avertyn.panes") || "{}");
+      if (typeof s.list === "boolean") setListOpen(s.list);
+      if (typeof s.rail === "boolean") setRailOpen(s.rail);
+    } catch {}
+  }, []);
+  useEffect(() => {
+    try { localStorage.setItem("avertyn.panes", JSON.stringify({ list: listOpen, rail: railOpen })); } catch {}
+  }, [listOpen, railOpen]);
   const [selected, setSelected] = useState(() => new Set());
   const [busy, setBusy] = useState("");
   const [verify, setVerify] = useState(null);
@@ -212,7 +224,7 @@ export default function Dashboard() {
   useEffect(() => {
     if (typeof window === "undefined") return;
     const p = new URLSearchParams(window.location.search);
-    const map = { overview: 0, cases: 1, workspace: 2, intelligence: 3, filing: 4, admin: 5 };
+    const map = { overview: 0, cases: 1, intelligence: 2, workspace: 3, filing: 4, admin: 5 };
     const t = p.get("tab");
     if (t && map[t] != null) setTab(map[t]);
     if (p.get("open") === "import") setImportOpen(true);
@@ -431,6 +443,7 @@ export default function Dashboard() {
           <a className="btn btn-s" style={{ padding: "8px 14px", textDecoration: "none" }} href="/authorities">Register</a>
           <a className="btn btn-s" style={{ padding: "8px 14px", textDecoration: "none" }} href="/templates">Templates</a>
           <a className="btn btn-s" style={{ padding: "8px 14px", textDecoration: "none" }} href="/library">Library</a>
+          <a className="btn btn-s" style={{ padding: "8px 14px", textDecoration: "none" }} href="/programs">Programs</a>
           <button className="btn btn-s" style={{ padding: "8px 14px" }} onClick={() => setImportOpen(true)}>+ Import</button>
           <AccountMenu email={email} onSignOut={signOut} onExport={exportData} />
         </div>
@@ -449,7 +462,7 @@ export default function Dashboard() {
             briefCounts={briefCounts} onPickBrief={pickBrief} onExportFiled={exportFiledBriefs} />
           <PredictionsView embedded onErr={setErr} onOpen={(id) => { setSel(id); setTab(1); setStage("all"); }} />
         </div>
-      ) : tab === 3 ? (
+      ) : tab === 2 ? (
         <div style={{ flex: 1, overflow: "auto", padding: "22px 26px" }}>
           <div className="shead">
             <div className="stitle">
@@ -466,9 +479,9 @@ export default function Dashboard() {
           </div>
           {intel === "exposure" ? <ExposureView exposure={exposure} embedded />
             : intel === "live" ? <LiveIntelligenceView orgId={orgId} onErr={setErr} embedded />
-            : <InitiatorsView orgId={orgId} onErr={setErr} embedded onPickInitiator={(name) => { setDispQuery(name); setStage("all"); setTab(1); }} />}
+            : <InitiatorsView orgId={orgId} onErr={setErr} embedded />}
         </div>
-      ) : tab === 2 ? (
+      ) : tab === 3 ? (
         <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "auto", minHeight: 0 }}>
           <WorkspaceHub email={email} orgId={orgId} userId={userId} onErr={setErr} />
         </div>
@@ -529,9 +542,12 @@ export default function Dashboard() {
               <button className="mini" onClick={() => downloadCSV("avertyn-disputes.csv", displayed, DISPUTE_CSV_COLS)}>Export CSV</button>
             </div>
           </div>
-          <div className="work" style={{ flex: 1 }}>
-          <div className="list">
-            <div className="lhdr"><b>{tabHeader}</b><span className="ct">{displayed.length}</span></div>
+          <div className={"work" + (listOpen ? "" : " list-collapsed") + (railOpen ? "" : " rail-collapsed")} style={{ flex: 1 }}>
+          <div className={"list" + (listOpen ? "" : " collapsed")}>
+            {listOpen ? (<>
+            <div className="lhdr"><b>{tabHeader}</b><span className="ct">{displayed.length}</span>
+              <button className="pane-toggle" title="Collapse case list" aria-label="Collapse case list" onClick={() => setListOpen(false)}>«</button>
+            </div>
             {displayed.length === 0
               ? <p className="muted" style={{ padding: 16 }}>Nothing here right now.</p>
               : displayed.map((r) => {
@@ -575,12 +591,27 @@ export default function Dashboard() {
                     </div>
                   );
                 })}
+            </>) : (
+              <button className="pane-reopen" title="Show case list" aria-label="Show case list" onClick={() => setListOpen(true)}><span className="chev">»</span><span className="vlabel">Cases</span></button>
+            )}
           </div>
           <div className="detail">
+            {detail && (
+              <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 10 }}>
+                <button className="mini" title={(listOpen || railOpen) ? "Collapse both panels for a full-width case" : "Restore both panels"}
+                  onClick={() => { const open = !(listOpen || railOpen); setListOpen(open); setRailOpen(open); }}>
+                  {(listOpen || railOpen) ? "↔ Full case" : "Exit full case"}
+                </button>
+              </div>
+            )}
             {!detail ? <p className="muted">Select a dispute…</p> : <Detail dd={detail} onRun={runEngine} onDoc={genLetter} onOpenNeg={openNeg} onAction={caseAction} onStageMoney={stageMoney} onView={setDocView} onExplain={() => setExplainId(sel)} onChanged={() => { loadDetail(sel); loadShell(); }} busy={busy} />}
           </div>
-          <div className="rail">
-            <div className="rlabel">Autopilot · governed</div>
+          <div className={"rail" + (railOpen ? "" : " collapsed")}>
+            {railOpen ? (<>
+            <div className="rlabel" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
+              <span>Autopilot · governed</span>
+              <button className="pane-toggle" title="Collapse autopilot panel" aria-label="Collapse autopilot panel" onClick={() => setRailOpen(false)}>»</button>
+            </div>
             <div className="rcard">
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
                 <b style={{ fontFamily: "var(--disp)", fontSize: 15 }}>Agent</b>
@@ -626,6 +657,9 @@ export default function Dashboard() {
             <div className="rcard"><div className="feed">
               {feed.map((e, i) => <div key={i}>{e.actor === "agent" ? "✦" : "•"} <b>{e.action_type}</b> · {e.actor}{e.rationale ? " — " + e.rationale.slice(0, 60) : ""}</div>)}
             </div></div>
+            </>) : (
+              <button className="pane-reopen" title="Show autopilot panel" aria-label="Show autopilot panel" onClick={() => setRailOpen(true)}><span className="chev">«</span><span className="vlabel">Autopilot</span></button>
+            )}
           </div>
         </div>
         </div>
@@ -906,8 +940,14 @@ function Detail({ dd, onRun, onDoc, onOpenNeg, onAction, onStageMoney, onView, o
         <div className="panel"><div className="ph">QPA defense</div><div className="pb">
           <Bar l="Demand" v={d.demand_amount} max={d.demand_amount} c="var(--sig)" />
           <Bar l="Plan QPA" v={qpa.plan_qpa} max={d.demand_amount} c="var(--ink)" showref />
-          <Bar l="FAIR Health median" v={qpa.benchmark_fairhealth} max={d.demand_amount} c="var(--c-teal)" />
+          <Bar l="Regional median" v={qpa.benchmark_regional} max={d.demand_amount} c="var(--c-teal)" />
           <Bar l="Defensible ceiling" v={qpa.defensible_ceiling} max={d.demand_amount} c="var(--c-sage)" />
+          {qpa.ceiling_source && (
+            <div className="muted" style={{ fontSize: 11.5, marginTop: 4, display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+              <span>Ceiling basis: {({ manual_override: "Manual override (this case)", plan_policy: "Plan policy", org_default: "Org default", global_default: "Global default" })[qpa.ceiling_source] || qpa.ceiling_source}</span>
+              {qpa.ceiling_above_benchmark && <span className="badge b-amber" title="This ceiling exceeds the regional benchmark median — above the defensible benchmark"><i className="dot d-amber" />Above benchmark</span>}
+            </div>
+          )}
           {qpa.notes && <p className="muted" style={{ fontSize: 12 }}>{qpa.notes}</p>}
         </div></div>
       )}
@@ -923,8 +963,8 @@ function Detail({ dd, onRun, onDoc, onOpenNeg, onAction, onStageMoney, onView, o
         <div className="pb">
           {(() => {
             const qpaAmt = Number(d.qpa_amount || 0);
-            const fh = Number(qpa?.benchmark_fairhealth || 0);
-            const bench = fh > 0 ? { v: fh, short: "FAIR Health" } : (qpa?.defensible_ceiling ? { v: Number(qpa.defensible_ceiling), short: "ceiling" } : null);
+            const fh = Number(qpa?.benchmark_regional || 0);
+            const bench = fh > 0 ? { v: fh, short: "Regional" } : (qpa?.defensible_ceiling ? { v: Number(qpa.defensible_ceiling), short: "ceiling" } : null);
             if (!offers || offers.length === 0) return <p className="muted">No offers yet. Open a negotiation to settle at ~125% of QPA before any IDR fee — the cheapest win.</p>;
             return (<>
               {bench && <div className="muted" style={{ fontSize: 11.5, marginBottom: 6 }}>Benchmarked against QPA {money(qpaAmt)} · {bench.short} {money(bench.v)}.</div>}

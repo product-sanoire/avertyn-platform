@@ -13,54 +13,86 @@ const API_BASE = (process.env.NEXT_PUBLIC_SUPABASE_URL || "https://ssjougrsaecdw
 const RESULT_MK = { pass: "ok", fail: "fail", warn: "warn", na: "na" };
 
 // ============================================================ Initiators
-export function InitiatorsView({ orgId, onErr, embedded }) {
+export function InitiatorsView({ orgId, onErr, embedded, onPickInitiator }) {
   const [rows, setRows] = useState([]);
   const [idre, setIdre] = useState([]);
+  const [lev, setLev] = useState(null);
+  const [trends, setTrends] = useState([]);
+  const [mom, setMom] = useState([]);
+  const [sort, setSort] = useState({ key: "disputes", dir: -1 });
+  const [isort, setISort] = useState({ key: "selections", dir: -1 });
 
   const load = useCallback(async () => {
     try {
-      const [{ data: sc, error: e1 }, { data: ib, error: e2 }] = await Promise.all([
+      const [{ data: sc, error: e1 }, { data: ib }, { data: lv }, { data: tr }, { data: mo }] = await Promise.all([
         supabase.from("initiator_scorecard").select("*").order("disputes", { ascending: false }),
         orgId ? supabase.rpc("idre_behavior", { p_org: orgId }) : Promise.resolve({ data: [] }),
+        supabase.rpc("leverage_summary"),
+        supabase.rpc("intel_trends", { p_months: 12 }),
+        supabase.rpc("initiator_momentum"),
       ]);
       if (e1) throw e1;
-      if (e2) throw e2;
       setRows(sc || []);
       setIdre(Array.isArray(ib) ? ib : []);
-    } catch (e) { onErr(e.message); }
+      setLev(lv && lv.ok ? lv : null);
+      setTrends(Array.isArray(tr) ? tr : []);
+      setMom(Array.isArray(mo) ? mo : []);
+    } catch (e) { onErr && onErr(e.message); }
   }, [orgId, onErr]);
   useEffect(() => { load(); }, [load]);
   useLive("initiators", ["disputes", "idre_selections", "awards"], load);
 
+  const momMap = {}; mom.forEach((m) => { momMap[m.initiator] = m; });
   const totDisputes = rows.reduce((a, r) => a + Number(r.disputes || 0), 0);
-  const totChallenged = rows.reduce((a, r) => a + Number(r.challenged || 0), 0);
-  const wIneligible = totDisputes
-    ? Math.round(rows.reduce((a, r) => a + Number(r.avg_ineligibility || 0) * Number(r.disputes || 0), 0) / totDisputes)
-    : 0;
-  const chartRows = [...rows].map((r) => ({ ...r, _m: r.avg_qpa ? Number(r.avg_demand) / Number(r.avg_qpa) : 0 })).sort((a, b) => b._m - a._m).slice(0, 8);
+  const chartRows = [...rows].map((r) => ({ ...r, _m: r.avg_qpa ? Number(r.avg_demand) / Number(r.avg_qpa) : 0 }))
+    .sort((a, b) => b._m - a._m).slice(0, 8);
   const maxMult = Math.max(1, ...chartRows.map((r) => r._m));
+
+  const monthsShown = trends.filter((t) => Number(t.filings) > 0 || Number(t.plan_wins) > 0 || Number(t.provider_wins) > 0);
+  const filSeries = monthsShown.map((t) => Number(t.filings));
+  const dqSeries = monthsShown.map((t) => Number(t.demand_qpa));
+  const wrSeries = monthsShown.map((t) => (t.win_rate == null ? 0 : Number(t.win_rate)));
+
+  const scoreRows = sortBy(rows.map((r) => ({ ...r, dq: r.avg_qpa ? Number(r.avg_demand) / Number(r.avg_qpa) : null })), sort);
+  const idreRows = sortBy(idre, isort);
 
   return (
     <div>
       {!embedded && <div className="dh"><h1 className="vh">Initiators &amp; IDREs</h1>
-        <span className="sub">Who's filing against your plans, how weak their filings are, and how each IDRE behaves — your negotiation leverage</span></div>}
+        <span className="sub">Who's filing against your plans, how weak their filings are, how they trend, and how each IDRE actually decides — your negotiation leverage</span></div>}
 
-      <div className="cards" style={{ marginTop: embedded ? 4 : 14 }}>
-        <div className="kpi-tile"><div className="l">Initiators</div><div className="n">{rows.length}</div></div>
-        <div className="kpi-tile"><div className="l">Disputes filed</div><div className="n">{totDisputes}</div></div>
-        <div className="kpi-tile"><div className="l">Avg ineligibility</div><div className="n">{wIneligible}</div><div className="goal">weighted across filings</div></div>
-        <div className="kpi-tile"><div className="l">Challenged</div><div className="n">{totChallenged}</div><div className="goal good">eligibility challenges filed</div></div>
-      </div>
+      {/* ── Leverage summary ── */}
+      {lev && (
+        <div className="cards" style={{ marginTop: embedded ? 4 : 14 }}>
+          <div className="kpi-tile"><div className="l">Open at risk</div><div className="n">{money(lev.at_risk)}</div><div className="goal">{lev.open} open disputes</div></div>
+          <div className="kpi-tile"><div className="l">Settle-favorable now</div><div className="n">{money(lev.settle_savings)}</div><div className="goal good">{lev.settle_favorable} in bargaining zone</div></div>
+          <div className="kpi-tile"><div className="l">Challengeable</div><div className="n">{lev.challengeable}</div><div className="goal">open · eligibility ≥ 80</div></div>
+          <div className="kpi-tile"><div className="l">Top overreach</div><div className="n" style={{ fontSize: 16, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{lev.top_initiator?.name || "—"}</div><div className="goal risk">{imult(lev.top_initiator?.mult)} demand ÷ QPA</div></div>
+        </div>
+      )}
 
+      {/* ── Trends ── */}
+      {monthsShown.length > 1 && (
+        <div className="panel">
+          <div className="ph">Trends · last {monthsShown.length} months<span className="act"><span className="muted" style={{ fontSize: 11 }}>filing volume, overreach and win-rate over time</span></span></div>
+          <div className="pb" style={{ display: "flex", gap: 28, flexWrap: "wrap", paddingTop: 14 }}>
+            <TrendStat label="Monthly filings" now={filSeries[filSeries.length - 1]} sub={`${totDisputes} total`}><Spark vals={filSeries} kind="bar" color="var(--sig,#b23a2a)" /></TrendStat>
+            <TrendStat label="Demand ÷ QPA" now={imult(dqSeries[dqSeries.length - 1])} sub="overreach drift"><Spark vals={dqSeries} color="var(--warn,#8a6a1f)" /></TrendStat>
+            <TrendStat label="Plan win-rate" now={ipct(wrSeries[wrSeries.length - 1])} sub="of resolved disputes"><Spark vals={wrSeries} kind="bar" color="var(--ok,#2e6b52)" /></TrendStat>
+          </div>
+        </div>
+      )}
+
+      {/* ── Demand ÷ QPA by initiator ── */}
       <div className="panel">
-        <div className="ph">Demand ÷ QPA by initiator<span className="act"><span className="muted" style={{ fontSize: 11 }}>how far each filer overreaches vs. the plan's QPA</span></span></div>
+        <div className="ph">Demand ÷ QPA by initiator<span className="act"><span className="muted" style={{ fontSize: 11 }}>how far each filer overreaches vs. the plan's QPA · ▲ = filing more this quarter</span></span></div>
         <div className="pb" style={{ paddingTop: 14 }}>
           {chartRows.length === 0 ? <p className="muted">No data yet.</p> : chartRows.map((r, i) => {
             const w = Math.min(100, (r._m / maxMult) * 100);
             return (
               <div key={i} style={{ display: "flex", alignItems: "center", gap: 12, padding: "7px 0" }}>
-                <div style={{ width: 140, fontSize: 12.5, fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{r.initiator}</div>
-                <div style={{ flex: 1, height: 14, background: "var(--sunk)", borderRadius: 999, overflow: "hidden" }}>
+                <div style={{ width: 150, fontSize: 12.5, fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{r.initiator}<MomArrow m={momMap[r.initiator]} /></div>
+                <div style={{ flex: 1, height: 14, background: "var(--sunk,#f0eee9)", borderRadius: 999, overflow: "hidden" }}>
                   <div style={{ height: "100%", width: w + "%", background: "linear-gradient(90deg,#c8492e,#a8321f)", borderRadius: 999 }} />
                 </div>
                 <div className="mono" style={{ width: 54, textAlign: "right", fontWeight: 600, fontSize: 12.5 }}>{r._m.toFixed(1)}×</div>
@@ -70,45 +102,156 @@ export function InitiatorsView({ orgId, onErr, embedded }) {
         </div>
       </div>
 
+      {/* ── Initiator scorecard (sortable, actionable) ── */}
       <div className="panel">
-        <div className="ph">Initiator scorecard<span className="act"><span className="muted" style={{ fontSize: 11 }}>ranked by filing volume — target the aggressive, weak filers first</span></span></div>
+        <div className="ph">Initiator scorecard<span className="act"><span className="muted" style={{ fontSize: 11 }}>click a column to sort · click a row to see that filer's cases</span></span></div>
         {rows.length === 0 ? <p className="muted" style={{ padding: 16 }}>No initiator data yet.</p> : (
           <table>
-            <thead><tr><th>Initiator</th><th>Disputes</th><th>Avg ineligibility</th><th>Challenged</th><th>Avg demand</th><th>Avg QPA</th><th>Demand ÷ QPA</th></tr></thead>
+            <thead><tr>
+              <Th label="Initiator" k="initiator" sort={sort} setSort={setSort} />
+              <Th label="Disputes" k="disputes" sort={sort} setSort={setSort} right />
+              <Th label="Avg inelig." k="avg_ineligibility" sort={sort} setSort={setSort} right />
+              <Th label="Win-rate" k="win_rate" sort={sort} setSort={setSort} right />
+              <Th label="Award ×QPA" k="avg_award_mult" sort={sort} setSort={setSort} right />
+              <Th label="Challenged" k="challenged" sort={sort} setSort={setSort} right />
+              <Th label="Demand ÷ QPA" k="dq" sort={sort} setSort={setSort} right />
+            </tr></thead>
             <tbody>
-              {rows.map((s, i) => {
-                const mult = s.avg_qpa ? (Number(s.avg_demand) / Number(s.avg_qpa)) : null;
-                return (
-                  <tr key={i}>
-                    <td><b>{s.initiator}</b></td>
-                    <td className="mono">{s.disputes}</td>
-                    <td className="mono">{s.avg_ineligibility ?? "—"}{s.avg_ineligibility != null && <span className={"badge " + (s.avg_ineligibility >= 60 ? "b-red" : s.avg_ineligibility >= 40 ? "b-amber" : "b-grey")} style={{ marginLeft: 6 }}>{s.avg_ineligibility >= 60 ? "weak" : s.avg_ineligibility >= 40 ? "mixed" : "solid"}</span>}</td>
-                    <td className="mono">{s.challenged}</td>
-                    <td className="mono">{money(s.avg_demand)}</td>
-                    <td className="mono">{money(s.avg_qpa)}</td>
-                    <td className="mono">{mult ? <span className="badge b-red">{mult.toFixed(1)}×</span> : "—"}</td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        )}
-      </div>
-
-      <div className="panel">
-        <div className="ph">IDRE behavior<span className="act"><span className="muted" style={{ fontSize: 11 }}>certified IDR entities you've been assigned — selections &amp; re-selections</span></span></div>
-        {idre.length === 0 ? <p className="muted" style={{ padding: 16 }}>No IDRE selections recorded yet.</p> : (
-          <table>
-            <thead><tr><th>Certified IDRE</th><th>Selections</th><th>Re-selections</th></tr></thead>
-            <tbody>
-              {idre.map((e, i) => (
-                <tr key={i}><td><b>{e.idre}</b></td><td className="mono">{e.selections}</td><td className="mono">{e.reselections}</td></tr>
+              {scoreRows.map((s, i) => (
+                <tr key={i} style={{ cursor: onPickInitiator ? "pointer" : "default" }}
+                  onClick={() => onPickInitiator && onPickInitiator(s.initiator)}
+                  title={onPickInitiator ? `Open ${s.initiator}'s cases` : undefined}>
+                  <td><b>{s.initiator}</b><MomArrow m={momMap[s.initiator]} /></td>
+                  <td className="mono" style={{ textAlign: "right" }}>{s.disputes}</td>
+                  <td className="mono" style={{ textAlign: "right" }}>{s.avg_ineligibility ?? "—"}
+                    {s.avg_ineligibility != null && <span className={"badge " + (s.avg_ineligibility >= 60 ? "b-red" : s.avg_ineligibility >= 40 ? "b-amber" : "b-grey")} style={{ marginLeft: 6 }}>{s.avg_ineligibility >= 60 ? "weak" : s.avg_ineligibility >= 40 ? "mixed" : "solid"}</span>}</td>
+                  <td className="mono" style={{ textAlign: "right" }}>{s.win_rate == null ? <span className="muted">—</span> : <b style={{ color: s.win_rate >= 0.6 ? "var(--ok,#2e6b52)" : s.win_rate >= 0.4 ? "var(--warn,#8a6a1f)" : "var(--sig,#b23a2a)" }}>{ipct(s.win_rate)}</b>}<span className="muted" style={{ fontSize: 10 }}> {s.resolved ? `n=${s.resolved}` : ""}</span></td>
+                  <td className="mono" style={{ textAlign: "right" }}>{s.avg_award_mult ? imult(s.avg_award_mult) : "—"}</td>
+                  <td className="mono" style={{ textAlign: "right" }}>{s.challenged}</td>
+                  <td className="mono" style={{ textAlign: "right" }}>{s.dq ? <span className="badge b-red">{s.dq.toFixed(1)}×</span> : "—"}</td>
+                </tr>
               ))}
             </tbody>
           </table>
         )}
       </div>
+
+      {/* ── IDRE intelligence (award tendency) ── */}
+      <div className="panel">
+        <div className="ph">IDRE intelligence<span className="act"><span className="muted" style={{ fontSize: 11 }}>how each certified IDR entity actually decides — favor the plan-friendly, contest the rest</span></span></div>
+        {idre.length === 0 ? <p className="muted" style={{ padding: 16 }}>No IDRE decisions recorded yet.</p> : (
+          <>
+            {lev?.best_idre && lev?.worst_idre && (
+              <div className="pb" style={{ paddingTop: 10, paddingBottom: 0, display: "flex", gap: 18, flexWrap: "wrap", fontSize: 12.5 }}>
+                <span><span className="badge b-green"><i className="dot d-green" />prefer</span> <b>{lev.best_idre.idre}</b> · {ipct(lev.best_idre.plan_favorable_rate)} plan-favorable, awards {imult(lev.best_idre.avg_award_pct_qpa)} QPA</span>
+                <span><span className="badge b-red"><i className="dot d-red" />contest</span> <b>{lev.worst_idre.idre}</b> · {ipct(lev.worst_idre.plan_favorable_rate)} plan-favorable, awards {imult(lev.worst_idre.avg_award_pct_qpa)} QPA</span>
+              </div>
+            )}
+            <table>
+              <thead><tr>
+                <Th label="Certified IDRE" k="idre" sort={isort} setSort={setISort} />
+                <Th label="Assigned" k="selections" sort={isort} setSort={setISort} right />
+                <Th label="Decided" k="decisions" sort={isort} setSort={setISort} right />
+                <Th label="Plan-favorable" k="plan_favorable_rate" sort={isort} setSort={setISort} right />
+                <Th label="Award ×QPA" k="avg_award_pct_qpa" sort={isort} setSort={setISort} right />
+                <Th label="Median ×QPA" k="median_award_pct_qpa" sort={isort} setSort={setISort} right />
+                <Th label="Days to decide" k="avg_days_to_determination" sort={isort} setSort={setISort} right />
+                <Th label="Reselect" k="reselections" sort={isort} setSort={setISort} right />
+              </tr></thead>
+              <tbody>
+                {idreRows.map((e, i) => {
+                  const pf = e.plan_favorable_rate;
+                  return (
+                    <tr key={i}>
+                      <td><b>{e.idre}</b></td>
+                      <td className="mono" style={{ textAlign: "right" }}>{e.selections}</td>
+                      <td className="mono" style={{ textAlign: "right" }}>{e.decisions}</td>
+                      <td style={{ textAlign: "right" }}>
+                        {pf == null ? <span className="muted">—</span> : (
+                          <span style={{ display: "inline-flex", alignItems: "center", gap: 6, justifyContent: "flex-end" }}>
+                            <span style={{ width: 46, height: 6, background: "var(--sunk,#f0eee9)", borderRadius: 999, overflow: "hidden", display: "inline-block" }}>
+                              <span style={{ display: "block", height: "100%", width: (pf * 100) + "%", background: pf >= 0.6 ? "var(--ok,#2e6b52)" : pf >= 0.5 ? "var(--warn,#8a6a1f)" : "var(--sig,#b23a2a)" }} />
+                            </span>
+                            <b className="mono" style={{ fontSize: 12 }}>{ipct(pf)}</b>
+                          </span>
+                        )}
+                      </td>
+                      <td className="mono" style={{ textAlign: "right" }}>{e.avg_award_pct_qpa ? imult(e.avg_award_pct_qpa) : "—"}</td>
+                      <td className="mono" style={{ textAlign: "right" }}>{e.median_award_pct_qpa ? imult(e.median_award_pct_qpa) : "—"}</td>
+                      <td className="mono" style={{ textAlign: "right" }}>{e.avg_days_to_determination != null ? e.avg_days_to_determination + "d" : "—"}</td>
+                      <td className="mono" style={{ textAlign: "right" }}>{e.reselections || 0}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </>
+        )}
+      </div>
     </div>
+  );
+}
+
+const ipct = (p) => (p == null ? "—" : Math.round(Number(p) * 100) + "%");
+const imult = (n) => (n == null ? "—" : Number(n).toFixed(1) + "×");
+function sortBy(arr, s) {
+  const { key, dir } = s;
+  return [...arr].sort((a, b) => {
+    const av = a[key], bv = b[key];
+    if (av == null) return 1;
+    if (bv == null) return -1;
+    const an = Number(av), bn = Number(bv);
+    if (!isNaN(an) && !isNaN(bn) && av !== "" && bv !== "") return (an - bn) * dir;
+    return String(av).localeCompare(String(bv)) * dir;
+  });
+}
+function Th({ label, k, sort, setSort, right }) {
+  const active = sort.key === k;
+  return (
+    <th style={{ cursor: "pointer", textAlign: right ? "right" : "left", whiteSpace: "nowrap", userSelect: "none" }}
+      onClick={() => setSort({ key: k, dir: active ? -sort.dir : -1 })}>
+      {label}{active ? (sort.dir < 0 ? " ↓" : " ↑") : ""}
+    </th>
+  );
+}
+function MomArrow({ m }) {
+  if (!m) return null;
+  if (m.delta_pct == null) return (m.last_q === 0 && m.this_q > 0)
+    ? <span className="badge b-amber" style={{ marginLeft: 6, fontSize: 10 }}>new</span> : null;
+  if (m.delta_pct === 0) return null;
+  const up = m.delta_pct > 0;
+  return <span title={`${m.last_q} → ${m.this_q} filings this quarter`} style={{ marginLeft: 6, fontSize: 10.5, fontWeight: 600, color: up ? "var(--sig,#b23a2a)" : "var(--ok,#2e6b52)" }}>{up ? "▲" : "▼"}{Math.abs(m.delta_pct)}%</span>;
+}
+function TrendStat({ label, now, sub, children }) {
+  return (
+    <div style={{ minWidth: 120 }}>
+      <div className="muted" style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: ".05em" }}>{label}</div>
+      <div style={{ fontFamily: "var(--num,monospace)", fontSize: 20, fontWeight: 700, margin: "2px 0 4px" }}>{now}</div>
+      {children}
+      <div className="muted" style={{ fontSize: 10.5, marginTop: 2 }}>{sub}</div>
+    </div>
+  );
+}
+function Spark({ vals, kind = "line", w = 116, h = 28, color = "#b23a2a" }) {
+  const nums = (vals || []).map((v) => Number(v) || 0);
+  if (!nums.length) return null;
+  const max = Math.max(1, ...nums), min = Math.min(0, ...nums);
+  const sx = (i) => (nums.length === 1 ? w / 2 : (i / (nums.length - 1)) * (w - 3) + 1.5);
+  const sy = (v) => h - 3 - ((v - min) / (max - min || 1)) * (h - 6);
+  if (kind === "bar") {
+    const bw = Math.max(2, (w - 2) / nums.length - 2.5);
+    return (
+      <svg width={w} height={h} viewBox={`0 0 ${w} ${h}`} aria-hidden="true">
+        {nums.map((v, i) => <rect key={i} x={(i / nums.length) * (w - 2) + 1.5} y={sy(v)} width={bw} height={Math.max(1, h - 3 - sy(v))} rx="1" fill={color} opacity="0.9" />)}
+      </svg>
+    );
+  }
+  const d = nums.map((v, i) => (i ? "L" : "M") + sx(i).toFixed(1) + "," + sy(v).toFixed(1)).join(" ");
+  return (
+    <svg width={w} height={h} viewBox={`0 0 ${w} ${h}`} aria-hidden="true">
+      <path d={d} fill="none" stroke={color} strokeWidth="1.5" />
+      <circle cx={sx(nums.length - 1)} cy={sy(nums[nums.length - 1])} r="2.2" fill={color} />
+    </svg>
   );
 }
 
