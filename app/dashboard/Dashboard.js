@@ -123,7 +123,7 @@ export default function Dashboard() {
       setOrgId(me?.org_id || null);
 
       const res = await Promise.all([
-        supabase.from("disputes").select("id, external_ref, cpt_code, demand_amount, qpa_amount, workflow_state, disposition, eligibility_score, respond_by, pay_by, phase, claim_number, idr_registration_number, plans(name), initiators(name), claims(count)").order("respond_by", { ascending: true, nullsFirst: false }),
+        supabase.from("disputes").select("id, external_ref, cpt_code, demand_amount, qpa_amount, workflow_state, disposition, eligibility_score, respond_by, pay_by, phase, claim_number, idr_registration_number, plans(name), initiators(name)").order("respond_by", { ascending: true, nullsFirst: false }),
         supabase.from("org_metrics").select("*").maybeSingle(),
         supabase.from("org_scorecard").select("*").maybeSingle(),
         supabase.from("awards_metrics").select("*").maybeSingle(),
@@ -177,7 +177,7 @@ export default function Dashboard() {
     if (!id) return;
     try {
       const [{ data: d }, { data: find }, { data: q }, { data: docs }, { data: offs }] = await Promise.all([
-        supabase.from("disputes").select("*, plans(name), initiators(name), claims(count)").eq("id", id).single(),
+        supabase.from("disputes").select("*, plans(name), initiators(name)").eq("id", id).single(),
         supabase.from("eligibility_findings").select("result, detail, eligibility_rules(name, severity)").eq("dispute_id", id),
         supabase.from("qpa_records").select("*").eq("dispute_id", id).maybeSingle(),
         supabase.from("documents").select("id, kind, title, status, esign_status, signed_by, signed_at, created_at, content").eq("dispute_id", id).order("created_at", { ascending: false }),
@@ -431,7 +431,6 @@ export default function Dashboard() {
           <a className="btn btn-s" style={{ padding: "8px 14px", textDecoration: "none" }} href="/authorities">Register</a>
           <a className="btn btn-s" style={{ padding: "8px 14px", textDecoration: "none" }} href="/templates">Templates</a>
           <a className="btn btn-s" style={{ padding: "8px 14px", textDecoration: "none" }} href="/library">Library</a>
-          <a className="btn btn-s" style={{ padding: "8px 14px", textDecoration: "none" }} href="/programs">Programs</a>
           <button className="btn btn-s" style={{ padding: "8px 14px" }} onClick={() => setImportOpen(true)}>+ Import</button>
           <AccountMenu email={email} onSignOut={signOut} onExport={exportData} />
         </div>
@@ -467,7 +466,7 @@ export default function Dashboard() {
           </div>
           {intel === "exposure" ? <ExposureView exposure={exposure} embedded />
             : intel === "live" ? <LiveIntelligenceView orgId={orgId} onErr={setErr} embedded />
-            : <InitiatorsView orgId={orgId} onErr={setErr} embedded />}
+            : <InitiatorsView orgId={orgId} onErr={setErr} embedded onPickInitiator={(name) => { setDispQuery(name); setStage("all"); setTab(1); }} />}
         </div>
       ) : tab === 2 ? (
         <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "auto", minHeight: 0 }}>
@@ -555,7 +554,6 @@ export default function Dashboard() {
                             <span className={"badge b-" + (idr ? "green" : "amber")} title={idr ? "Federal IDR" : "Open negotiation"}>
                               <i className={"dot d-" + (idr ? "green" : "amber")} />{idr ? "IDR" : "Open neg."}
                             </span>
-                            {ci.isBatch && <span className="badge b-ink" title={`Batched — ${ci.claimCount} claims under this case${ci.leadClaim ? `; lead ${ci.leadClaim}` : ""}`}>Batch · {ci.claimCount}</span>}
                             {ci.internal && ci.isLegal && <span className="muted" style={{ fontSize: 11 }}>internal #{ci.internal}</span>}
                           </>
                         ); })()}
@@ -865,12 +863,11 @@ function Detail({ dd, onRun, onDoc, onOpenNeg, onAction, onStageMoney, onView, o
   return (
     <div>
       <div className="dh">{(() => { const ci = caseIdentity(d); return (<>
-        <h1>{ci.isBatch ? ci.label : `${ci.label} ${ci.number}`}</h1>
+        <h1>{ci.label} {ci.number}</h1>
         <span className={"badge b-" + (ci.phaseIdr ? "green" : "amber")} style={{ marginLeft: 10 }} title="Case phase">
           <i className={"dot d-" + (ci.phaseIdr ? "green" : "amber")} />{ci.phaseIdr ? "Federal IDR" : "Open negotiation"}
         </span>
-        {ci.isBatch && ci.leadClaim && <span className="badge b-ink" style={{ marginLeft: 8 }} title="Lead claim in this batch">Lead {ci.leadClaim}</span>}
-        {ci.internal && <span className="badge b-grey" style={{ marginLeft: 8 }} title="Operator internal case number — the permanent identifier across phases">Internal #{ci.internal}</span>}
+        {ci.internal && <span className="badge b-grey" style={{ marginLeft: 8 }} title="Operator internal case number">Internal #{ci.internal}</span>}
       </>); })()}
         <span className="sub">{d.initiators?.name} · CPT {d.cpt_code} · {d.plans?.name} · {d.workflow_state}</span>
         {d.win_prob != null && (() => { const wp = Math.round(Number(d.win_prob) * 100); const tone = wp >= 60 ? "sage" : wp >= 40 ? "amber" : "red"; return <span className={"badge b-" + tone} style={{ marginLeft: 10 }} title="Modeled plan-prevail probability — open Explain for the full driver breakdown"><i className={"dot d-" + tone} />{wp}% win</span>; })()}
@@ -909,7 +906,7 @@ function Detail({ dd, onRun, onDoc, onOpenNeg, onAction, onStageMoney, onView, o
         <div className="panel"><div className="ph">QPA defense</div><div className="pb">
           <Bar l="Demand" v={d.demand_amount} max={d.demand_amount} c="var(--sig)" />
           <Bar l="Plan QPA" v={qpa.plan_qpa} max={d.demand_amount} c="var(--ink)" showref />
-          <Bar l="Regional median" v={qpa.benchmark_regional} max={d.demand_amount} c="var(--c-teal)" />
+          <Bar l="FAIR Health median" v={qpa.benchmark_fairhealth} max={d.demand_amount} c="var(--c-teal)" />
           <Bar l="Defensible ceiling" v={qpa.defensible_ceiling} max={d.demand_amount} c="var(--c-sage)" />
           {qpa.notes && <p className="muted" style={{ fontSize: 12 }}>{qpa.notes}</p>}
         </div></div>
@@ -926,8 +923,8 @@ function Detail({ dd, onRun, onDoc, onOpenNeg, onAction, onStageMoney, onView, o
         <div className="pb">
           {(() => {
             const qpaAmt = Number(d.qpa_amount || 0);
-            const fh = Number(qpa?.benchmark_regional || 0);
-            const bench = fh > 0 ? { v: fh, short: "Regional" } : (qpa?.defensible_ceiling ? { v: Number(qpa.defensible_ceiling), short: "ceiling" } : null);
+            const fh = Number(qpa?.benchmark_fairhealth || 0);
+            const bench = fh > 0 ? { v: fh, short: "FAIR Health" } : (qpa?.defensible_ceiling ? { v: Number(qpa.defensible_ceiling), short: "ceiling" } : null);
             if (!offers || offers.length === 0) return <p className="muted">No offers yet. Open a negotiation to settle at ~125% of QPA before any IDR fee — the cheapest win.</p>;
             return (<>
               {bench && <div className="muted" style={{ fontSize: 11.5, marginBottom: 6 }}>Benchmarked against QPA {money(qpaAmt)} · {bench.short} {money(bench.v)}.</div>}
