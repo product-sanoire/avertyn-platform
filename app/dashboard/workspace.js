@@ -1,9 +1,15 @@
 "use client";
-// Avertyn — Workspace hub (Cockpit + Week + Month).
-// One deadline-safe, case-aware surface. "Today" is the triage cockpit (a
-// unified queue of deadlines, tasks and messages ranked by urgency, a focus
-// pane, and a deadline-radar / team-load rail). Week and Month layer the same
-// items onto a calendar. A persistent KPI ribbon + filters sit above all three.
+// Avertyn — Workspace hub. One deadline-safe, case-aware surface with four views:
+//   • Today  — the triage cockpit: a unified, urgency-ranked queue of deadlines,
+//     tasks and messages; an act-in-place focus pane; and a right rail carrying
+//     the deadline radar, team load, and the governed agent (staged approvals,
+//     autonomy dials, ledger).
+//   • Week / Month — the same items laid onto a calendar.
+//   • Board — a lifecycle pipeline: every open case as a living card flowing
+//     Intake → Eligibility → QPA defense → Respond & file → Awaiting → Award,
+//     with its deadlines, tasks, messages and agent-staged actions on the card.
+// A persistent KPI ribbon, a Me/Team scope, type filters and keyboard triage
+// (J/K to move, E to resolve/complete) sit above all views.
 import { useEffect, useState, useCallback, useMemo, useRef } from "react";
 import { supabase } from "../../lib/supabaseClient";
 import { useLive } from "../../lib/useLive";
@@ -12,6 +18,23 @@ import { money, caseIdentity } from "../../lib/format";
 const HOUR = 3600e3, DAY = 24 * HOUR, STALE_DAYS = 30;
 const PRIO_TONE = { urgent: "red", high: "amber", med: "ink", low: "grey" };
 const AV_COLORS = ["a1", "a2", "a3", "a4", "a5"];
+const MODES = ["off", "suggest", "review", "auto"];
+const MONEY = new Set(["settle", "schedule_payment"]);
+const ACTION_LABEL = {
+  triage: "Triage", defend_qpa: "Defend QPA", challenge_eligibility: "Challenge eligibility",
+  open_negotiation: "Open negotiation", submit_response: "Submit response",
+  submit_additional_info: "Additional info", request_extension: "Request extension",
+  withdraw: "Withdraw", escalate: "Escalate", schedule_payment: "Schedule payment", settle: "Settle",
+};
+// lifecycle lanes for the Board — maps disputes.workflow_state → a column
+const LANES = [
+  ["intake", "Intake", ["intake", "triage"]],
+  ["eligibility", "Eligibility", ["eligibility_review"]],
+  ["qpa", "QPA defense", ["qpa_defense"]],
+  ["respond", "Respond & file", ["response_prep"]],
+  ["await", "Awaiting", ["awaiting_determination"]],
+  ["award", "Award", ["award_payment"]],
+];
 const humanize = (s) => (s || "").replace(/_/g, " ").trim();
 const startOfDay = (d) => { const x = new Date(d); x.setHours(0, 0, 0, 0); return x; };
 const sameDay = (a, b) => a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
@@ -31,7 +54,6 @@ function countdown(at, type, unread) {
   if (h < 24) return { txt: Math.max(1, Math.round(h)) + "h", tone: "soon" };
   const d = Math.round(h / DAY); return { txt: d + "d", tone: d <= 3 ? "soon" : "ok" };
 }
-// event colour class for calendar chips (urgency first, then type)
 function chipClass(at, type, kind) {
   if (at) { const diff = at.getTime() - Date.now(); if (diff < 0) return "e-over"; if (diff <= 3 * DAY) return "e-soon"; }
   if (type === "task") return "e-task";
@@ -40,8 +62,9 @@ function chipClass(at, type, kind) {
   return "e-idr";
 }
 
-export function WorkspaceHub({ email, orgId, userId, onErr }) {
-  const [view, setView] = useState("today");            // today | week | month
+export function WorkspaceHub({ email, orgId, userId, onErr, onOpenCase, onOpenTab, onExplain, onBatchFile }) {
+  const [view, setView] = useState("today");            // today | week | month | board
+  const [scope, setScope] = useState("team");           // team | me
   const [typeF, setTypeF] = useState("all");            // all | deadline | task | message
   const [ownerF, setOwnerF] = useState("all");          // all | <assignee text>
   const [sel, setSel] = useState(null);                 // selected feed item id
@@ -58,27 +81,33 @@ export function WorkspaceHub({ email, orgId, userId, onErr }) {
   const [events, setEvents] = useState([]);
   const [caseMap, setCaseMap] = useState({});
   const [users, setUsers] = useState([]);
+  const [approvals, setApprovals] = useState([]);       // agent: approval_queue (pending)
+  const [autonomy, setAutonomy] = useState([]);         // agent: autonomy_settings
+  const [agentFeed, setAgentFeed] = useState([]);       // agent: action_log
   const selRef = useRef(null);
 
   const load = useCallback(async () => {
     try {
-      const [dl, wi, th, ev, ds, us] = await Promise.all([
+      const [dl, wi, th, ev, ds, us, aq, au, al] = await Promise.all([
         supabase.from("deadlines").select("id, kind, due_at, status, dispute_id"),
         supabase.from("work_items").select("id, title, status, priority, due_at, dispute_id, assignee, completed_at"),
         supabase.from("comm_threads").select("id, subject, status, unread, last_at, dispute_id, assignee"),
         supabase.from("calendar_events").select("id, title, kind, start_at, dispute_id"),
-        supabase.from("disputes").select("id, external_ref, claim_number, idr_registration_number, phase, cpt_code, demand_amount, qpa_amount, initiators(name), plans(name)"),
+        supabase.from("disputes").select("id, external_ref, claim_number, idr_registration_number, phase, workflow_state, disposition, eligibility_score, cpt_code, demand_amount, qpa_amount, initiators(name), plans(name)"),
         supabase.from("app_users").select("email, full_name, active"),
+        supabase.from("approval_queue").select("id, dispute_id, action_type, amount, rationale").eq("status", "pending"),
+        supabase.from("autonomy_settings").select("action_type, mode, max_amount"),
+        supabase.from("action_log").select("action_type, actor, rationale, created_at").order("created_at", { ascending: false }).limit(8),
       ]);
-      const firstErr = [dl, wi, th, ev, ds, us].find((r) => r.error)?.error;
+      const firstErr = [dl, wi, th, ev, ds, us, aq, au, al].find((r) => r.error)?.error;
       if (firstErr) throw firstErr;
       setDeadlines(dl.data || []); setTasks(wi.data || []); setThreads(th.data || []); setEvents(ev.data || []);
       const cm = {}; (ds.data || []).forEach((d) => { cm[d.id] = d; }); setCaseMap(cm);
-      setUsers(us.data || []);
+      setUsers(us.data || []); setApprovals(aq.data || []); setAutonomy(au.data || []); setAgentFeed(al.data || []);
     } catch (e) { onErr && onErr(e.message || String(e)); }
   }, [onErr]);
   useEffect(() => { load(); }, [load]);
-  useLive("workspace", ["deadlines", "work_items", "comm_threads", "calendar_events"], load);
+  useLive("workspace", ["deadlines", "work_items", "comm_threads", "calendar_events", "approval_queue", "action_log", "autonomy_settings"], load);
 
   const caseOf = useCallback((id) => (id && caseMap[id] ? caseMap[id] : null), [caseMap]);
   const labelOf = useCallback((id) => { const c = caseOf(id); return c ? caseIdentity(c) : null; }, [caseOf]);
@@ -109,13 +138,13 @@ export function WorkspaceHub({ email, orgId, userId, onErr }) {
   };
   const passType = (it) => typeF === "all" || it.type === typeF;
   const passOwner = (it) => ownerF === "all" || it.owner === ownerF;
-  // "Stale" = an open deadline overdue by more than 30 days (typically abandoned /
-  // seed backlog). Hidden by default from both the queue and the Overdue KPI so
-  // the cockpit stays actionable; toggle to include, or bulk-resolve them.
+  // "Me" scope keeps items I own; deadlines are case-level (unowned) so they stay
+  // visible in both scopes — you never lose a filing window by narrowing to "Me".
+  const passScope = (it) => scope === "team" || it.type === "deadline" || it.owner === email;
   const staleCutoff = Date.now() - STALE_DAYS * DAY;
   const isStale = (it) => it.type === "deadline" && it.at && it.at.getTime() < staleCutoff;
   const staleCount = feed.filter(isStale).length;
-  const shown = feed.filter((it) => passType(it) && passOwner(it) && (showStale || !isStale(it)));
+  const shown = feed.filter((it) => passType(it) && passOwner(it) && passScope(it) && (showStale || !isStale(it)));
 
   const groups = useMemo(() => {
     const g = { over: [], soon: [], week: [] };
@@ -128,12 +157,13 @@ export function WorkspaceHub({ email, orgId, userId, onErr }) {
   const kpis = useMemo(() => {
     let over = 0, soon = 0, unread = 0, unassigned = 0;
     for (const it of feed) {
+      if (!passScope(it)) continue;
       if (it.type !== "message" && it.at) { const diff = it.at.getTime() - Date.now(); if (diff < 0) { if (showStale || !isStale(it)) over++; } else if (diff <= 3 * DAY) soon++; }
       if (it.type === "message" && it.unread) unread++;
       if ((it.type === "task" || it.type === "message") && !it.owner) unassigned++;
     }
     return { over, soon, unread, unassigned };
-  }, [feed, showStale]); // eslint-disable-line
+  }, [feed, showStale, scope, email]); // eslint-disable-line
 
   // default selection → first overdue, else first soon
   useEffect(() => {
@@ -151,6 +181,27 @@ export function WorkspaceHub({ email, orgId, userId, onErr }) {
       if (selected.unread) supabase.from("comm_threads").update({ unread: false }).eq("id", selected.rawId).then(() => load());
     } else setFocusMsgs([]);
   }, [sel]); // eslint-disable-line
+
+  // keyboard triage (Today view): J/K move, E resolve/complete the selection
+  useEffect(() => {
+    if (view !== "today") return;
+    const onKey = (e) => {
+      const tag = (document.activeElement && document.activeElement.tagName) || "";
+      if (/INPUT|TEXTAREA|SELECT/.test(tag)) return;
+      const list = [...groups.over, ...groups.soon, ...groups.week];
+      if (!list.length) return;
+      let idx = list.findIndex((i) => i.id === sel);
+      if (e.key === "j" || e.key === "ArrowDown") { e.preventDefault(); idx = Math.min(list.length - 1, idx + 1); setSel(list[idx].id); }
+      else if (e.key === "k" || e.key === "ArrowUp") { e.preventDefault(); idx = Math.max(0, idx - 1); setSel(list[idx].id); }
+      else if (e.key === "e" && idx >= 0) {
+        const it = list[idx];
+        if (it.type === "task") markTaskDone(it.raw);
+        else if (it.type === "deadline") resolveDeadline(it.id);
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [view, groups, sel]); // eslint-disable-line
 
   async function sendReply() {
     if (!reply.trim() || !selected || selected.type !== "message") return;
@@ -188,6 +239,48 @@ export function WorkspaceHub({ email, orgId, userId, onErr }) {
     setBusy("");
   }
 
+  // ---- act-in-place: draft a challenge letter from the focus pane ----------
+  async function draftLetter(caseId) {
+    setBusy("letter");
+    try {
+      const { data, error } = await supabase.rpc("generate_document", { p_dispute: caseId, p_kind: "challenge_letter" });
+      if (error) throw error;
+      if (data) { const { error: e2 } = await supabase.rpc("sign_document", { p_doc: data, p_signer: email }); if (e2) throw e2; }
+      load();
+    } catch (e) { onErr && onErr(e.message); }
+    setBusy("");
+  }
+
+  // ---- agent rail actions --------------------------------------------------
+  async function releaseApproval(q) {
+    // Money actions (settle / schedule_payment) need dual-control step-up, which
+    // lives on the case rail — route there rather than half-release here.
+    if (MONEY.has(q.action_type)) { onOpenCase && onOpenCase(q.dispute_id); return; }
+    setBusy("rel" + q.id);
+    try { const { error } = await supabase.rpc("release_approval", { p_id: q.id, p_actor: email }); if (error) throw error; load(); }
+    catch (e) { onErr && onErr(e.message); }
+    setBusy("");
+  }
+  async function rejectApproval(q) {
+    setBusy("rej" + q.id);
+    try { const { error } = await supabase.rpc("reject_approval", { p_id: q.id, p_actor: email }); if (error) throw error; load(); }
+    catch (e) { onErr && onErr(e.message); }
+    setBusy("");
+  }
+  async function setDial(action_type, mode) {
+    setBusy("dial" + action_type);
+    try { const { error } = await supabase.rpc("autonomy_set", { p_action_type: action_type, p_mode: mode, p_max_amount: null }); if (error) throw error; load(); }
+    catch (e) { onErr && onErr(e.message); }
+    setBusy("");
+  }
+  async function runTick() {
+    if (!orgId) return;
+    setBusy("tick");
+    try { const { error } = await supabase.rpc("bavert_tick_all", { p_org: orgId }); if (error) throw error; load(); }
+    catch (e) { onErr && onErr(e.message); }
+    setBusy("");
+  }
+
   // ---- team load -----------------------------------------------------------
   const teamLoad = useMemo(() => {
     const openTasks = tasks.filter((t) => (t.status || "") !== "done");
@@ -195,12 +288,12 @@ export function WorkspaceHub({ email, orgId, userId, onErr }) {
     for (const t of openTasks) { const k = t.assignee || ""; if (!k) continue; counts[k] = (counts[k] || 0) + 1; }
     const list = users.filter((u) => u.active !== false).map((u) => {
       const c = counts[u.email] || counts[u.full_name] || 0;
-      return { key: u.email, name: u.full_name || u.email, count: c };
+      return { key: u.email, name: u.full_name || u.email, count: c, me: u.email === email };
     }).filter((u) => u.count > 0);
     list.sort((a, b) => b.count - a.count);
     const max = Math.max(1, ...list.map((u) => u.count));
     return { list: list.slice(0, 6), max };
-  }, [tasks, users]);
+  }, [tasks, users, email]);
 
   // ---- deadline radar (next 7 days) ---------------------------------------
   const radar = useMemo(() => {
@@ -209,22 +302,31 @@ export function WorkspaceHub({ email, orgId, userId, onErr }) {
       .sort((a, b) => a.at - b.at).slice(0, 7);
   }, [shown]);
 
-  // ---- owners for filter ---------------------------------------------------
   const owners = useMemo(() => {
     const s = new Set(); feed.forEach((i) => { if (i.owner) s.add(i.owner); });
     return Array.from(s);
   }, [feed]);
+
+  const agent = { approvals, autonomy, feed: agentFeed, release: releaseApproval, reject: rejectApproval, dial: setDial, tick: runTick, busy };
+  const nav = { openCase: onOpenCase, openTab: onOpenTab, explain: onExplain, batchFile: onBatchFile, draftLetter };
+  // open a board card in the focus pane (nearest live item for that case), else jump to Cases
+  const openCaseItem = (caseId) => {
+    const items = shown.length ? shown : feed;
+    const mine = items.filter((i) => i.caseId === caseId).sort((a, b) => (a.at ? a.at.getTime() : Infinity) - (b.at ? b.at.getTime() : Infinity));
+    if (mine[0]) { setSel(mine[0].id); setView("today"); }
+    else if (onOpenCase) onOpenCase(caseId);
+  };
 
   return (
     <div className="wsroot">
       {/* view switch */}
       <div className="ws-bar">
         <div>
-          <h2 className="ws-title vh">{view === "today" ? "Today" : view === "week" ? "This week" : "Calendar"}</h2>
-          <div className="ws-sub">{view === "today" ? "Everything that needs you, ranked by urgency" : view === "week" ? "Deadlines, tasks & events by day" : "Business-day, holiday-aware windows & events"}</div>
+          <h2 className="ws-title vh">{view === "today" ? "Today" : view === "week" ? "This week" : view === "board" ? "Board" : "Calendar"}</h2>
+          <div className="ws-sub">{view === "today" ? "Everything that needs you, ranked by urgency" : view === "week" ? "Deadlines, tasks & events by day" : view === "board" ? "Every open case as living work — pipeline, people & the agent" : "Business-day, holiday-aware windows & events"}</div>
         </div>
         <div className="ws-seg">
-          {[["today", "◆ Today"], ["week", "▦ Week"], ["month", "▤ Month"]].map(([k, l]) => (
+          {[["today", "◆ Today"], ["week", "▦ Week"], ["month", "▤ Month"], ["board", "▊ Board"]].map(([k, l]) => (
             <button key={k} className={view === k ? "on" : ""} onClick={() => setView(k)}>{l}</button>
           ))}
         </div>
@@ -236,10 +338,17 @@ export function WorkspaceHub({ email, orgId, userId, onErr }) {
         <div className="ws-kpi amberbar" onClick={() => { setView("today"); }}><div className="l"><i className="dot d-amber" />Due ≤ 72h</div><div className="n" style={{ color: "var(--warn)" }}>{kpis.soon}</div><div className="s">deadlines &amp; tasks</div></div>
         <div className="ws-kpi inkbar" onClick={() => { setView("today"); setTypeF("message"); }}><div className="l"><i className="dot d-ink" />Unread</div><div className="n">{kpis.unread}</div><div className="s">payer &amp; provider threads</div></div>
         <div className="ws-kpi greybar" onClick={() => { setView("today"); }}><div className="l"><i className="dot d-grey" />Unassigned</div><div className="n">{kpis.unassigned}</div><div className="s">need an owner</div></div>
+        <div className="ws-kpi agentbar" onClick={() => { setView("today"); }} title="Actions the governed agent has staged for your release"><div className="l"><span className="ws-agdot">✦</span>Agent waiting</div><div className="n" style={{ color: "var(--sig-ink)" }}>{approvals.length}</div><div className="s">staged by autopilot</div></div>
       </div>
 
-      {/* filters + legend */}
+      {/* scope + filters + legend */}
       <div className="ws-tools">
+        <div className="ws-scope">
+          {[["me", "◆ Me"], ["team", "◇ Team"]].map(([k, l]) => (
+            <button key={k} className={scope === k ? "on" : ""} onClick={() => setScope(k)}>{l}</button>
+          ))}
+        </div>
+        <span className="ws-div" />
         {[["all", "All types"], ["deadline", "Deadlines"], ["task", "Tasks"], ["message", "Messages"]].map(([k, l]) => (
           <button key={k} className={"ws-fchip" + (typeF === k ? " on" : "")} onClick={() => setTypeF(k)}>{l}</button>
         ))}
@@ -252,6 +361,7 @@ export function WorkspaceHub({ email, orgId, userId, onErr }) {
         {staleCount > 0 && <button className={"ws-fchip" + (showStale ? " on" : "")} onClick={() => setShowStale((s) => !s)} title={`Deadlines overdue by more than ${STALE_DAYS} days`}>{showStale ? "Hide stale" : `${staleCount} stale hidden`}</button>}
         {staleCount > 0 && <button className="ws-fchip" disabled={busy === "stale"} onClick={clearStale} title="Mark all stale deadlines handled">{busy === "stale" ? "Resolving…" : "Resolve stale"}</button>}
         <div className="ws-legend">
+          <span className="ws-kbd" title="Keyboard triage in Today"><b>J/K</b> move · <b>E</b> resolve</span>
           <span><i style={{ background: "var(--sig)" }} />Overdue</span><span><i style={{ background: "var(--warn)" }} />Due soon</span>
           <span><i style={{ background: "var(--ok)" }} />Task</span><span><i style={{ background: "#3f5c8a" }} />Message</span><span><i style={{ background: "var(--ink)" }} />IDR event</span>
         </div>
@@ -260,17 +370,19 @@ export function WorkspaceHub({ email, orgId, userId, onErr }) {
       {view === "today" && (
         <Cockpit groups={groups} sel={sel} setSel={setSel} labelOf={labelOf} caseOf={caseOf}
           selected={selected} focusMsgs={focusMsgs} reply={reply} setReply={setReply} sendReply={sendReply}
-          markTaskDone={markTaskDone} resolveDeadline={resolveDeadline} busy={busy} radar={radar} teamLoad={teamLoad} />
+          markTaskDone={markTaskDone} resolveDeadline={resolveDeadline} busy={busy} radar={radar} teamLoad={teamLoad}
+          agent={agent} nav={nav} />
       )}
-      {view === "week" && <WeekView deadlines={deadlines} tasks={tasks} events={events} typeF={typeF} ownerF={ownerF} labelOf={labelOf} weekOff={weekOff} setWeekOff={setWeekOff} setView={setView} setSel={setSel} />}
+      {view === "week" && <WeekView deadlines={deadlines} tasks={tasks} events={events} typeF={typeF} ownerF={ownerF} scope={scope} email={email} labelOf={labelOf} weekOff={weekOff} setWeekOff={setWeekOff} setView={setView} setSel={setSel} />}
       {view === "month" && <MonthView deadlines={deadlines} tasks={tasks} events={events} typeF={typeF} monthOff={monthOff} setMonthOff={setMonthOff} />}
+      {view === "board" && <BoardView caseMap={caseMap} feed={feed} approvals={approvals} scope={scope} email={email} onOpen={openCaseItem} agentTick={runTick} agentBusy={busy === "tick"} />}
     </div>
   );
 }
 
 /* ============================ Today cockpit ============================ */
 const CAP = 8;
-function Cockpit({ groups, sel, setSel, labelOf, caseOf, selected, focusMsgs, reply, setReply, sendReply, markTaskDone, resolveDeadline, busy, radar, teamLoad }) {
+function Cockpit({ groups, sel, setSel, labelOf, caseOf, selected, focusMsgs, reply, setReply, sendReply, markTaskDone, resolveDeadline, busy, radar, teamLoad, agent, nav }) {
   const [leftOpen, setLeftOpen] = useState(true);
   const [rightOpen, setRightOpen] = useState(true);
   const total = groups.over.length + groups.soon.length + groups.week.length;
@@ -296,7 +408,7 @@ function Cockpit({ groups, sel, setSel, labelOf, caseOf, selected, focusMsgs, re
     );
   };
   return (
-    <div className="ws-cockpit" style={{ gridTemplateColumns: `${leftOpen ? "1.05fr" : "42px"} minmax(0,1.6fr) ${rightOpen ? "258px" : "42px"}` }}>
+    <div className="ws-cockpit" style={{ gridTemplateColumns: `${leftOpen ? "1.05fr" : "42px"} minmax(0,1.6fr) ${rightOpen ? "272px" : "42px"}` }}>
       {leftOpen ? (
       <div className="ws-col">
         <div className="ws-colhd"><h3>Needs you now</h3><span className="ct">{total}</span><button className="ws-collapse" title="Collapse queue" onClick={() => setLeftOpen(false)}>«</button></div>
@@ -313,7 +425,7 @@ function Cockpit({ groups, sel, setSel, labelOf, caseOf, selected, focusMsgs, re
 
       <div className="ws-col">
         <div className="ws-read">
-          {!selected ? <p className="muted" style={{ padding: 18 }}>Select an item…</p> : <FocusPane it={selected} caseOf={caseOf} labelOf={labelOf} msgs={focusMsgs} reply={reply} setReply={setReply} sendReply={sendReply} markTaskDone={markTaskDone} resolveDeadline={resolveDeadline} busy={busy} />}
+          {!selected ? <p className="muted" style={{ padding: 18 }}>Select an item…</p> : <FocusPane it={selected} caseOf={caseOf} labelOf={labelOf} msgs={focusMsgs} reply={reply} setReply={setReply} sendReply={sendReply} markTaskDone={markTaskDone} resolveDeadline={resolveDeadline} busy={busy} nav={nav} />}
         </div>
       </div>
 
@@ -335,17 +447,72 @@ function Cockpit({ groups, sel, setSel, labelOf, caseOf, selected, focusMsgs, re
         {teamLoad.list.length === 0 ? <p className="muted" style={{ fontSize: 12 }}>No assigned work.</p> : teamLoad.list.map((u) => {
           const pct = Math.round(u.count / teamLoad.max * 100);
           const col = pct >= 85 ? "var(--sig)" : pct >= 60 ? "var(--warn)" : "var(--ok)";
-          return (<div key={u.key} className="ws-teamrow"><span className={"ws-av " + avColor(u.key)}>{initials(u.name)}</span><div className="nm">{u.name}</div><div className="cap"><div className="load">{u.count} open</div><div className="capbar"><i style={{ width: pct + "%", background: col }} /></div></div></div>);
+          return (<div key={u.key} className="ws-teamrow"><span className={"ws-av " + avColor(u.key)}>{initials(u.name)}</span><div className="nm">{u.name}{u.me ? " · you" : ""}</div><div className="cap"><div className="load">{u.count} open</div><div className="capbar"><i style={{ width: pct + "%", background: col }} /></div></div></div>);
         })}
+        <AgentRail agent={agent} caseOf={caseOf} labelOf={labelOf} nav={nav} />
       </div>
       ) : (
-        <button className="ws-slim right" title="Show radar & team load" onClick={() => setRightOpen(true)}><span className="chev">«</span><span className="lbl">Radar</span></button>
+        <button className="ws-slim right" title="Show radar, team load & agent" onClick={() => setRightOpen(true)}><span className="chev">«</span><span className="lbl">Radar</span>{agent.approvals.length > 0 && <span className="ws-slim-n">{agent.approvals.length}</span>}</button>
       )}
     </div>
   );
 }
 
-function FocusPane({ it, caseOf, labelOf, msgs, reply, setReply, sendReply, markTaskDone, resolveDeadline, busy }) {
+/* ---- Agent co-pilot rail (governed autopilot) ---- */
+function AgentRail({ agent, caseOf, labelOf, nav }) {
+  const { approvals, autonomy, feed, release, reject, dial, tick, busy } = agent;
+  return (
+    <>
+      <div className="ws-agenthd">
+        <span className="ws-agav">✦</span>
+        <div className="ws-agmeta"><b>Agent · governed</b><span>autopilot &amp; approvals</span></div>
+        <button className="mini" disabled={busy === "tick"} onClick={tick} title="Run one governed autopilot pass">{busy === "tick" ? "…" : "Run tick"}</button>
+      </div>
+
+      <div className="ws-agsub">Waiting on you · {approvals.length}</div>
+      {approvals.length === 0 ? <p className="muted" style={{ fontSize: 12 }}>Nothing staged. 🎉</p> : approvals.map((q) => {
+        const ci = labelOf(q.dispute_id); const isMoney = MONEY.has(q.action_type);
+        return (
+          <div key={q.id} className="ws-app">
+            <div className="ws-apphd">
+              <b>{ACTION_LABEL[q.action_type] || humanize(q.action_type)}{q.amount != null ? " · " + money(q.amount) : ""}</b>
+              <span className={"badge " + (isMoney ? "b-red" : "b-amber")}><i className={"dot d-" + (isMoney ? "red" : "amber")} />{isMoney ? "Dual-control" : "Review"}</span>
+            </div>
+            {ci && <div className="ws-appcase"><span className="ws-cchip">{ci.number}</span></div>}
+            {q.rationale && <div className="ws-apprat">{q.rationale}</div>}
+            <div className="ws-appacts">
+              <button className="btn btn-a" disabled={busy === "rel" + q.id} onClick={() => release(q)}>{busy === "rel" + q.id ? "…" : isMoney ? "Release · step-up →" : "Release"}</button>
+              <button className="btn btn-s" disabled={busy === "rej" + q.id} onClick={() => reject(q)}>{busy === "rej" + q.id ? "…" : "Reject"}</button>
+            </div>
+          </div>
+        );
+      })}
+
+      {autonomy.length > 0 && <>
+        <div className="ws-agsub">Autonomy dial</div>
+        <div className="ws-dials">
+          {autonomy.map((a) => (
+            <div key={a.action_type} className="ws-dial">
+              <span>{ACTION_LABEL[a.action_type] || humanize(a.action_type)}</span>
+              <select value={a.mode} disabled={busy === "dial" + a.action_type} onChange={(e) => dial(a.action_type, e.target.value)}>
+                {MODES.map((m) => <option key={m} value={m}>{m[0].toUpperCase() + m.slice(1)}</option>)}
+              </select>
+            </div>
+          ))}
+        </div>
+      </>}
+
+      <div className="ws-agsub">Activity · ledger</div>
+      <div className="ws-astream">
+        {feed.length === 0 ? <p className="muted" style={{ fontSize: 12 }}>No recent actions.</p> : feed.map((e, i) => (
+          <div key={i} className="ws-aline">{e.actor === "agent" ? "✦" : "•"} <b>{humanize(e.action_type)}</b>{e.rationale ? " — " + e.rationale.slice(0, 72) : ""}</div>
+        ))}
+      </div>
+    </>
+  );
+}
+
+function FocusPane({ it, caseOf, labelOf, msgs, reply, setReply, sendReply, markTaskDone, resolveDeadline, busy, nav }) {
   const c = caseOf(it.caseId); const ci = labelOf(it.caseId);
   return (
     <>
@@ -368,37 +535,118 @@ function FocusPane({ it, caseOf, labelOf, msgs, reply, setReply, sendReply, mark
           <div className="ws-reply"><input value={reply} onChange={(e) => setReply(e.target.value)} onKeyDown={(e) => e.key === "Enter" && sendReply()} placeholder="Write a reply…" /><button className="btn btn-a" disabled={busy === "send" || !reply.trim()} onClick={sendReply}>{busy === "send" ? "Sending…" : "Send"}</button></div>
         </>
       ) : (
-        <>
-          <div className="muted" style={{ fontSize: 12.5, marginBottom: 12 }}>
-            {it.at ? (it.at.getTime() < Date.now() ? "Past due — resolve to clear it from Overdue." : "Due " + fmtDT(it.at) + ".") : "No date set."}
-            {it.type === "task" && it.status ? " · " + humanize(it.status) : ""}
-          </div>
-          <div className="ws-toolbar">
-            {it.type === "task" && <button className="btn btn-a" disabled={busy === "done"} onClick={() => markTaskDone(it.raw)}>{busy === "done" ? "…" : "✓ Mark done"}</button>}
-            {it.type === "deadline" && <button className="btn btn-a" disabled={busy === "resolve"} onClick={() => resolveDeadline(it.id)}>{busy === "resolve" ? "…" : "✓ Mark resolved"}</button>}
-            {c && <a className="btn" href={`/dispute/${it.caseId}`}>Open case →</a>}
-          </div>
-        </>
+        <div className="muted" style={{ fontSize: 12.5, marginBottom: 12 }}>
+          {it.at ? (it.at.getTime() < Date.now() ? "Past due — resolve to clear it from Overdue." : "Due " + fmtDT(it.at) + ".") : "No date set."}
+          {it.type === "task" && it.status ? " · " + humanize(it.status) : ""}
+        </div>
+      )}
+
+      {/* act-in-place toolbar — primary + cross-tab */}
+      <div className="ws-toolbar">
+        {it.type === "task" && <button className="btn btn-a" disabled={busy === "done"} onClick={() => markTaskDone(it.raw)}>{busy === "done" ? "…" : "✓ Mark done"}</button>}
+        {it.type === "deadline" && <button className="btn btn-a" disabled={busy === "resolve"} onClick={() => resolveDeadline(it.id)}>{busy === "resolve" ? "…" : "✓ Mark resolved"}</button>}
+        {c && nav?.openCase && <button className="btn" onClick={() => nav.openCase(it.caseId)}>Open case →</button>}
+        {c && nav?.draftLetter && <button className="btn" disabled={busy === "letter"} onClick={() => nav.draftLetter(it.caseId)} title="Generate & sign a challenge letter">{busy === "letter" ? "Drafting…" : "✎ Draft challenge letter"}</button>}
+        {c && nav?.batchFile && <button className="btn" onClick={() => nav.batchFile([it.caseId])}>⛁ Batch &amp; file →</button>}
+        {c && nav?.explain && <button className="btn" onClick={() => nav.explain(it.caseId)}>◎ Explain</button>}
+        {c && nav?.openTab && <button className="btn" onClick={() => nav.openTab(2)} title="See this filer on the Intelligence scorecard">Intel: {c.initiators?.name || "initiator"} →</button>}
+      </div>
+
+      {c && (
+        <div className="ws-lives">
+          <div className="ws-liveslabel">Where this lives</div>
+          This item threads across the platform — the case sits in <b>Cases{c.workflow_state ? " · " + humanize(c.workflow_state) : ""}</b>, and <b>{c.initiators?.name || "the initiator"}</b> appears on your <b>Intelligence</b> scorecard. Every action here writes to the same hash-chained ledger.
+        </div>
       )}
     </>
   );
 }
 
+/* ============================ Board (lifecycle pipeline) ============================ */
+function BoardView({ caseMap, feed, approvals, scope, email, onOpen, agentTick, agentBusy }) {
+  const cases = Object.values(caseMap);
+  const stagedSet = useMemo(() => new Set(approvals.map((a) => a.dispute_id)), [approvals]);
+  const laneOf = (ws) => { const k = (ws || "").toLowerCase(); const l = LANES.find(([, , st]) => st.includes(k)); return l ? l[0] : "intake"; };
+
+  // per-case attached work + nearest deadline
+  const info = useMemo(() => {
+    const m = {};
+    for (const it of feed) {
+      if (!it.caseId) continue;
+      const e = m[it.caseId] || (m[it.caseId] = { next: null, tasks: 0, unread: false, mine: false });
+      if (it.type === "task") e.tasks++;
+      if (it.type === "message" && it.unread) e.unread = true;
+      if (it.owner === email) e.mine = true;
+      if (it.type === "deadline" && it.at) { if (!e.next || it.at < e.next) e.next = it.at; }
+    }
+    return m;
+  }, [feed, email]);
+
+  const totalStake = cases.reduce((a, c) => a + Math.max(0, (c.demand_amount || 0) - (c.qpa_amount || 0)), 0);
+
+  return (
+    <div className="ws-board">
+      <div className="ws-boardbar">
+        <span className="muted" style={{ fontSize: 12.5 }}>{cases.length} open case{cases.length === 1 ? "" : "s"} · {money(totalStake)} demand over QPA at stake{scope === "me" ? " · dimming cases without your work" : ""}</span>
+        <button className="mini" disabled={agentBusy} onClick={agentTick} style={{ marginLeft: "auto" }}>{agentBusy ? "…" : "✦ Run agent tick"}</button>
+      </div>
+      <div className="ws-lanes">
+        {LANES.map(([key, label]) => {
+          const cs = cases.filter((c) => laneOf(c.workflow_state) === key);
+          const stake = cs.reduce((a, c) => a + Math.max(0, (c.demand_amount || 0) - (c.qpa_amount || 0)), 0);
+          return (
+            <div key={key} className="ws-lane">
+              <div className="ws-lanehd">
+                <div className="lt">{label}<span className="lc">{cs.length}</span></div>
+                <div className="lv">{money(stake)} at stake</div>
+              </div>
+              <div className="ws-lanebody">
+                {cs.length === 0 ? <p className="muted" style={{ fontSize: 11.5, padding: "4px 2px" }}>—</p> : cs.map((c) => {
+                  const ci = caseIdentity(c); const e = info[c.id] || {};
+                  const cd = e.next ? countdown(e.next, "deadline") : null;
+                  const idr = c.phase === "idr";
+                  const dim = scope === "me" && !e.mine;
+                  return (
+                    <div key={c.id} className={"ws-wcard" + (cd && cd.tone === "over" ? " hot" : cd && cd.tone === "soon" ? " warm" : "") + (dim ? " dim" : "")} onClick={() => onOpen(c.id)}>
+                      <div className="r1"><span className="ws-cchip">{ci.number}</span><span className={"badge b-" + (idr ? "green" : "amber")} style={{ padding: "1px 7px" }}>{idr ? "IDR" : "Neg"}</span><span className="init">{c.initiators?.name || "—"}</span></div>
+                      <div className="val">{money(c.demand_amount)} <span className="q">/ {money(c.qpa_amount)} QPA</span></div>
+                      <div className="chips">
+                        {e.unread && <span className="wchip msg">✉ reply</span>}
+                        {e.tasks > 0 && <span className="wchip task">✓ {e.tasks}</span>}
+                        {stagedSet.has(c.id) && <span className="wchip agent">✦ staged</span>}
+                        {c.disposition === "provider_win" && <span className="badge b-ink">award</span>}
+                      </div>
+                      <div className="foot">
+                        {cd ? <span className={"ws-cdpill cd-" + cd.tone}>{cd.txt}</span> : <span className="faint" style={{ fontSize: 11 }}>no deadline</span>}
+                        {(c.eligibility_score || 0) >= 60 && <span className="badge b-red" style={{ marginLeft: "auto" }} title="Ineligibility score">{c.eligibility_score}</span>}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 /* ============================ Week ============================ */
-function WeekView({ deadlines, tasks, events, typeF, ownerF, labelOf, weekOff, setWeekOff, setView, setSel }) {
+function WeekView({ deadlines, tasks, events, typeF, ownerF, scope, email, labelOf, weekOff, setWeekOff, setView, setSel }) {
   const monday = useMemo(() => { const t = startOfDay(new Date()); const dow = (t.getDay() + 6) % 7; t.setDate(t.getDate() - dow + weekOff * 7); return t; }, [weekOff]);
   const days = Array.from({ length: 7 }, (_, i) => { const d = new Date(monday); d.setDate(monday.getDate() + i); return d; });
   const today = startOfDay(new Date());
   const pass = (type) => typeF === "all" || type === typeF;
+  const passScope = (owner, type) => scope === "team" || type === "deadline" || owner === email;
 
   const allItems = useMemo(() => {
     const arr = [];
-    if (pass("deadline")) for (const d of deadlines) { if (["done", "resolved", "met"].includes((d.status || "").toLowerCase())) continue; if (d.due_at) arr.push({ id: "d" + d.id, type: "deadline", title: humanize(d.kind) || "Deadline", at: new Date(d.due_at), caseId: d.dispute_id }); }
-    if (pass("task")) for (const t of tasks) { if ((t.status || "") === "done") continue; if (t.due_at && (ownerF === "all" || t.assignee === ownerF)) arr.push({ id: "t" + t.id, type: "task", title: t.title, at: new Date(t.due_at), caseId: t.dispute_id, owner: t.assignee }); }
-    // calendar events read as scheduled milestones (respect deadline/message type filters loosely)
+    if (pass("deadline")) for (const d of deadlines) { if (["done", "resolved", "met"].includes((d.status || "").toLowerCase())) continue; if (d.due_at && passScope(null, "deadline")) arr.push({ id: "d" + d.id, type: "deadline", title: humanize(d.kind) || "Deadline", at: new Date(d.due_at), caseId: d.dispute_id }); }
+    if (pass("task")) for (const t of tasks) { if ((t.status || "") === "done") continue; if (t.due_at && (ownerF === "all" || t.assignee === ownerF) && passScope(t.assignee, "task")) arr.push({ id: "t" + t.id, type: "task", title: t.title, at: new Date(t.due_at), caseId: t.dispute_id, owner: t.assignee }); }
     if (typeF === "all") for (const e of events) { if (e.start_at) arr.push({ id: "e" + e.id, type: "event", title: e.title || humanize(e.kind), at: new Date(e.start_at), caseId: e.dispute_id, kind: e.kind }); }
     return arr;
-  }, [deadlines, tasks, events, typeF, ownerF]);
+  }, [deadlines, tasks, events, typeF, ownerF, scope, email]);
 
   const carried = allItems.filter((i) => i.type !== "event" && i.at < today).sort((a, b) => a.at - b.at);
   const dayItems = (d) => allItems.filter((i) => sameDay(i.at, d) && i.at >= today).sort((a, b) => a.at - b.at);

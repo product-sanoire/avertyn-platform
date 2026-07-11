@@ -287,12 +287,13 @@ export default function Dashboard() {
     catch (e) { setErr(e.message || "Bulk action failed."); }
     setBusy("");
   }
-  // Build a batch from the selected cases and jump to Filing (batch → IDRE → file).
-  async function batchAndFile() {
-    if (!selected.size) return;
+  // Build a batch from an explicit set of case ids and jump to Filing.
+  async function batchFileIds(ids) {
+    const list = Array.from(ids || []);
+    if (!list.length) return;
     setBusy("bulk"); setErr("");
     try {
-      const { data, error } = await supabase.rpc("execute_batch_action", { p_action: "build_batch", p_params: { dispute_ids: Array.from(selected) }, p_actor: "operator", p_rationale: "Batch & file from case queue" });
+      const { data, error } = await supabase.rpc("execute_batch_action", { p_action: "build_batch", p_params: { dispute_ids: list }, p_actor: "operator", p_rationale: "Batch & file from case queue" });
       if (error) throw error;
       if (data && data.ok === false) throw new Error(data.reason === "over_50_line_cap" ? "A batch can hold at most 50 lines." : (data.reason || "Couldn't build the batch."));
       setSelected(new Set());
@@ -302,6 +303,8 @@ export default function Dashboard() {
     } catch (e) { setErr(e.message || "Batch & file failed."); }
     setBusy("");
   }
+  // Build a batch from the selected cases and jump to Filing (batch → IDRE → file).
+  const batchAndFile = () => batchFileIds(selected);
 
   const runEngine = () => act("engine", () => rpc("run_eligibility", { p_dispute: sel }));
   const runAutopilot = () => act("auto", () => orgId && rpc("bavert_tick_all", { p_org: orgId }));
@@ -484,7 +487,11 @@ export default function Dashboard() {
         </div>
       ) : tab === 3 ? (
         <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "auto", minHeight: 0 }}>
-          <WorkspaceHub email={email} orgId={orgId} userId={userId} onErr={setErr} />
+          <WorkspaceHub email={email} orgId={orgId} userId={userId} onErr={setErr}
+            onOpenCase={(id) => { setSel(id); setTab(1); setStage("all"); }}
+            onOpenTab={(i) => setTab(i)}
+            onExplain={(id) => setExplainId(id)}
+            onBatchFile={(ids) => batchFileIds(ids)} />
         </div>
       ) : tab === 4 ? (
         <div style={{ flex: 1, overflow: "auto", padding: 22 }}>

@@ -791,6 +791,65 @@ input,select,textarea{color:var(--ink);font-family:inherit}
 @media(max-width:680px){.onb-tiers{grid-template-columns:1fr}.onb-card-b{padding-left:16px}.onb-hero{flex-direction:column;align-items:flex-start}}
 
 /* ============================================================
+   Workspace redesign — scope, act-in-place focus, agent rail,
+   keyboard hint, and the lifecycle Board view. Additive; extends
+   the existing .ws- system without altering it.
+   ============================================================ */
+/* Me/Team scope */
+.ws-scope{display:inline-flex;background:var(--sunk);border-radius:var(--r-pill);padding:3px;gap:2px}
+.ws-scope button{font:inherit;font-size:12px;font-weight:600;color:var(--mut);border:0;background:none;padding:5px 12px;border-radius:var(--r-pill);cursor:pointer;transition:.14s}
+.ws-scope button.on{background:var(--card);color:var(--ink);box-shadow:var(--sh-1)}
+.ws-kbd{font-size:10.5px;color:var(--faint)}.ws-kbd b{font-family:var(--num);color:var(--mut);font-weight:600}
+/* agent-waiting KPI */
+.ws-kpi.agentbar{border-left:3px solid var(--sig-ink)}
+.ws-agdot{color:var(--sig-ink);font-size:12px;line-height:1}
+/* focus pane: "where this lives" */
+.ws-lives{margin-top:14px;font-size:12px;line-height:1.65;color:var(--mut);background:var(--card-2);border:1px solid var(--line);border-radius:12px;padding:11px 13px}
+.ws-lives b{color:var(--ink-2);font-weight:600}
+.ws-liveslabel{font-size:9.5px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--faint);margin-bottom:5px}
+/* agent co-pilot rail */
+.ws-agenthd{display:flex;align-items:center;gap:9px;margin:18px 0 10px;padding-top:14px;border-top:1px solid var(--line)}
+.ws-agav{width:30px;height:30px;border-radius:9px;flex:0 0 auto;display:grid;place-items:center;font-size:14px;color:#fff;background:linear-gradient(150deg,#c14a2f,#7a2410);box-shadow:0 0 0 3px var(--sig-soft)}
+.ws-agmeta{flex:1;min-width:0;display:flex;flex-direction:column;line-height:1.2}
+.ws-agmeta b{font-family:var(--disp);font-size:13px;font-weight:600}
+.ws-agmeta span{font-size:10.5px;color:var(--faint)}
+.ws-agsub{font-size:9.5px;font-weight:700;letter-spacing:.13em;text-transform:uppercase;color:var(--faint);margin:14px 0 8px}
+.ws-app{background:linear-gradient(160deg,#fbf3ef,var(--card));border:1px solid var(--sig-line);border-radius:12px;padding:11px 12px;margin-bottom:9px}
+.ws-apphd{display:flex;align-items:center;justify-content:space-between;gap:8px}.ws-apphd b{font-size:12px}
+.ws-appcase{margin-top:6px}
+.ws-apprat{font-size:11px;color:var(--mut);line-height:1.5;margin:7px 0 9px}
+.ws-appacts{display:flex;gap:7px}
+.ws-appacts .btn{padding:7px 11px;font-size:12px}
+.ws-dials{display:flex;flex-direction:column;gap:4px}
+.ws-dial{display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:12px;padding:3px 0}
+.ws-dial select{font:inherit;font-size:11.5px;font-weight:600;color:var(--ink);border:0;border-radius:8px;padding:5px 8px;background:var(--sunk);cursor:pointer}
+.ws-astream{display:flex;flex-direction:column;gap:2px}
+.ws-aline{font-size:11px;color:var(--mut);line-height:1.6}.ws-aline b{color:var(--ink);font-weight:600}
+/* Board view */
+.ws-board{border-top:1px solid var(--line);padding:14px 20px 24px}
+.ws-boardbar{display:flex;align-items:center;gap:10px;margin-bottom:14px}
+.ws-lanes{display:grid;grid-template-columns:repeat(6,minmax(190px,1fr));gap:11px;overflow-x:auto;align-items:start;padding-bottom:6px}
+.ws-lane{background:var(--card-2);border:1px solid var(--line);border-radius:var(--r-2);min-height:180px;display:flex;flex-direction:column}
+.ws-lanehd{padding:11px 12px 8px}
+.ws-lanehd .lt{font-size:11px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--ink-2);display:flex;align-items:center;gap:7px}
+.ws-lanehd .lc{margin-left:auto;font-family:var(--num);font-size:11px;background:var(--card);border:1px solid var(--line);color:var(--mut);padding:0 7px;border-radius:var(--r-pill);font-weight:600}
+.ws-lanehd .lv{font-size:10px;color:var(--faint);margin-top:3px;font-family:var(--num)}
+.ws-lanebody{padding:0 9px 10px;display:flex;flex-direction:column;gap:8px}
+.ws-wcard{background:var(--card);border:1px solid var(--line);border-radius:12px;border-top:3px solid transparent;padding:10px 11px;cursor:pointer;transition:box-shadow var(--dur),transform var(--dur)}
+.ws-wcard:hover{box-shadow:var(--sh-2);transform:translateY(-2px)}
+.ws-wcard.hot{border-top-color:var(--sig)}.ws-wcard.warm{border-top-color:var(--warn)}
+.ws-wcard.dim{opacity:.4}
+.ws-wcard .r1{display:flex;align-items:center;gap:6px}
+.ws-wcard .init{font-size:11px;color:var(--mut);margin-left:auto;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:92px}
+.ws-wcard .val{font-family:var(--num);font-size:12.5px;font-weight:600;margin:7px 0 2px}
+.ws-wcard .val .q{color:var(--faint);font-weight:400;font-size:11px}
+.ws-wcard .chips{display:flex;align-items:center;gap:5px;flex-wrap:wrap;margin-top:8px}
+.ws-wcard .foot{display:flex;align-items:center;gap:7px;margin-top:9px}
+.wchip{display:inline-flex;align-items:center;gap:4px;font-size:10px;font-weight:700;padding:2px 7px;border-radius:var(--r-pill)}
+.wchip.msg{background:var(--sig-soft);color:var(--sig-ink)}.wchip.task{background:var(--ok-soft);color:var(--ok)}.wchip.agent{background:#efe9f5;color:#6a5a8a}
+@media(max-width:1000px){.ws-lanes{grid-auto-flow:column;grid-template-columns:none;grid-auto-columns:minmax(200px,1fr)}}
+
+/* ============================================================
    Minimal sub-tabs (Finish 2): small-caps, tracked, dot marker.
    Additive override of the .seg segmented control (previously a
    filled pill tray). Re-styles chrome only; markup + behavior
