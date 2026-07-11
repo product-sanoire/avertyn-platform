@@ -24,6 +24,8 @@ export function LiveIntelligenceView({ orgId, onErr, embedded }) {
   const [strat, setStrat] = useState(null);
   const [roi, setRoi] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [port, setPort] = useState(null);
+  const [psort, setPsort] = useState({ key: "savings_vs_idr", dir: -1 });
 
   // org disputes for the selector (RLS-scoped to this org)
   useEffect(() => {
@@ -61,6 +63,13 @@ export function LiveIntelligenceView({ orgId, onErr, embedded }) {
     return () => { live = false; };
   }, [orgId]);
 
+  // book-level portfolio roll-up of the negotiation model
+  useEffect(() => {
+    let live = true;
+    supabase.rpc("negotiation_portfolio", { p_limit: 200 }).then(({ data }) => { if (live) setPort(data && data.ok ? data : null); });
+    return () => { live = false; };
+  }, [orgId]);
+
   // per-dispute intelligence
   const load = useCallback(async (id) => {
     if (!id) return;
@@ -83,6 +92,7 @@ export function LiveIntelligenceView({ orgId, onErr, embedded }) {
 
   return (
     <div className="il-wrap">
+      <PortfolioPanel port={port} sel={sel} onPick={setSel} psort={psort} setPsort={setPsort} />
       <div className="il-ctl">
         <label className="il-sm" htmlFor="il-disp">Dispute</label>
         <select id="il-disp" value={sel} onChange={(e) => setSel(e.target.value)}>
@@ -346,5 +356,91 @@ function RoiBody({ v, tr, setTr }) {
         effective <b>{eff}%</b> — and it's the same whether savings are large or small. No incentive to inflate "savings".
       </div>
     </>
+  );
+}
+
+/* ───────────────────────── Book-level portfolio roll-up ───────────────────────── */
+function pfSort(arr, s) {
+  const { key, dir } = s;
+  return [...arr].sort((a, b) => {
+    const av = a[key], bv = b[key];
+    if (av == null) return 1;
+    if (bv == null) return -1;
+    const an = Number(av), bn = Number(bv);
+    if (!isNaN(an) && !isNaN(bn) && av !== "" && bv !== "") return (an - bn) * dir;
+    return String(av).localeCompare(String(bv)) * dir;
+  });
+}
+function PfKpi({ l, v, s, tone }) {
+  return (
+    <div style={{ background: "var(--sunk,#f0eee9)", borderRadius: 8, padding: "8px 10px" }}>
+      <div className="il-muted" style={{ fontSize: 10.5, textTransform: "uppercase", letterSpacing: ".05em" }}>{l}</div>
+      <div className="il-num" style={{ fontSize: 18, fontWeight: 700, color: tone === "ok" ? "var(--ok,#2e6b52)" : undefined }}>{v}</div>
+      <div className="il-muted" style={{ fontSize: 10 }}>{s}</div>
+    </div>
+  );
+}
+function PortfolioPanel({ port, sel, onPick, psort, setPsort }) {
+  if (!port || !port.summary) return null;
+  const sm = port.summary;
+  const items = pfSort(port.items || [], psort);
+  const Th = ({ label, k, right }) => {
+    const active = psort.key === k;
+    return (
+      <th style={{ cursor: "pointer", textAlign: right ? "right" : "left", whiteSpace: "nowrap", userSelect: "none" }}
+        onClick={() => setPsort({ key: k, dir: active ? -psort.dir : -1 })}>
+        {label}{active ? (psort.dir < 0 ? " ↓" : " ↑") : ""}
+      </th>
+    );
+  };
+  return (
+    <div className="il-card" style={{ marginBottom: 14 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", flexWrap: "wrap", gap: 8 }}>
+        <h3>Book-level leverage</h3>
+        <span className="il-cap">Negotiation model across {sm.modeled} open disputes · click a case to load it below</span>
+      </div>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(112px,1fr))", gap: 10, margin: "10px 0 6px" }}>
+        <PfKpi l="Open at risk" v={money(sm.at_risk)} s={`${sm.open} disputes`} />
+        <PfKpi l="In bargaining zone" v={`${sm.in_zone} / ${sm.modeled}`} s="settle achievable" />
+        <PfKpi l="Settle-favorable" v={money(sm.settle_savings)} s={`${sm.settle_favorable} vs IDR`} tone="ok" />
+        <PfKpi l="Avg target" v={sm.avg_target_pct_qpa != null ? Number(sm.avg_target_pct_qpa).toFixed(2) + "× QPA" : "—"} s="weighted" />
+      </div>
+      {items.length === 0 ? <p className="il-muted" style={{ fontSize: 12.5 }}>No open disputes modeled yet.</p> : (
+        <div style={{ overflowX: "auto", marginTop: 4, maxHeight: 320, overflowY: "auto" }}>
+          <table className="il-pf" style={{ width: "100%" }}>
+            <thead><tr>
+              <Th label="Case" k="claim_number" />
+              <Th label="CPT" k="cpt" />
+              <Th label="Path" k="path" />
+              <Th label="Target" k="target" right />
+              <Th label="×QPA" k="target_pct_qpa" right />
+              <Th label="Accept" k="accept_prob" right />
+              <Th label="Saves vs IDR" k="savings_vs_idr" right />
+              <Th label="Window" k="days_left" right />
+            </tr></thead>
+            <tbody>
+              {items.map((it) => {
+                const urgent = it.days_left != null && it.days_left <= 5;
+                const on = it.dispute_id === sel;
+                return (
+                  <tr key={it.dispute_id} onClick={() => onPick(it.dispute_id)}
+                    style={{ cursor: "pointer", background: on ? "var(--sig-wash,#f7ece9)" : undefined }}
+                    title="Load this case in the cockpit below">
+                    <td><b>{it.claim_number || "—"}</b></td>
+                    <td className="il-num">{it.cpt || "—"}</td>
+                    <td><span className={"il-pill " + (it.path === "settle" ? "p-ok" : "p-sig")}>{it.path}</span></td>
+                    <td className="il-num" style={{ textAlign: "right" }}>{money(it.target)}</td>
+                    <td className="il-num" style={{ textAlign: "right" }}>{it.target_pct_qpa != null ? Number(it.target_pct_qpa).toFixed(1) + "×" : "—"}</td>
+                    <td className="il-num" style={{ textAlign: "right" }}>{it.accept_prob != null ? Math.round(it.accept_prob * 100) + "%" : "—"}</td>
+                    <td className="il-num" style={{ textAlign: "right", color: it.savings_vs_idr > 0 ? "var(--ok,#2e6b52)" : undefined, fontWeight: 600 }}>{money(it.savings_vs_idr)}</td>
+                    <td className="il-num" style={{ textAlign: "right" }}>{it.days_left != null ? <span className={urgent ? "il-pill p-sig" : ""}>{it.days_left}d</span> : "—"}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
   );
 }
