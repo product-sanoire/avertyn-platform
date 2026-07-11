@@ -188,7 +188,7 @@ export function CalendarView({ onErr, embedded }) {
     if (e1 || e2) return onErr((e1 || e2).message);
     setItems([
       ...(ev || []).map((x) => ({ id: "e" + x.id, title: x.title, kind: x.kind, at: x.start_at })),
-      ...(dl || []).map((x) => ({ id: "d" + x.id, title: (x.kind || "deadline").replace(/_/g, " "), kind: "deadline", at: x.due_at })),
+      ...(dl || []).map((x) => ({ id: "d" + x.id, title: (x.kind || "deadline").replace(/_/g, " ").replace(/\b(idre|idr|qpa|nsa|cpt|drg|rbp|erisa|ncci|mue|tpa|hcpcs|npi|cms|hhs|dol|wc|ptp|mrf)\b/gi, m => m.toUpperCase()), kind: "deadline", at: x.due_at })),
     ].filter((x) => x.at));
   }, [onErr]);
   useEffect(() => { load(); }, [load]);

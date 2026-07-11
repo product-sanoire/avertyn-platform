@@ -35,7 +35,7 @@ const LANES = [
   ["await", "Awaiting", ["awaiting_determination"]],
   ["award", "Award", ["award_payment"]],
 ];
-const humanize = (s) => (s || "").replace(/_/g, " ").trim();
+const humanize = (s) => (s || "").replace(/_/g, " ").replace(/\b(idre|idr|qpa|nsa|cpt|drg|rbp|erisa|ncci|mue|tpa|hcpcs|npi|cms|hhs|dol|wc|ptp|mrf)\b/gi, m => m.toUpperCase()).trim();
 const startOfDay = (d) => { const x = new Date(d); x.setHours(0, 0, 0, 0); return x; };
 const sameDay = (a, b) => a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
 const fmtDT = (t) => (t ? new Date(t).toLocaleString(undefined, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }) : "—");

@@ -330,7 +330,7 @@ export function DeadlinesView({ orgId, onErr, embedded }) {
                 return (
                   <tr key={d.id}>
                     <td><b>#{d.disputes?.external_ref || "—"}</b></td>
-                    <td>{(d.kind || "deadline").replace(/_/g, " ")}</td>
+                    <td>{(d.kind || "deadline").replace(/_/g, " ").replace(/\b(idre|idr|qpa|nsa|cpt|drg|rbp|erisa|ncci|mue|tpa|hcpcs|npi|cms|hhs|dol|wc|ptp|mrf)\b/gi, m => m.toUpperCase())}</td>
                     <td className="mono">{new Date(d.due_at).toLocaleString(undefined, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}</td>
                     <td><span className={"badge " + (od ? "b-red" : "b-amber")}><i className={"dot d-" + (od ? "red" : "amber")} />{untilLabel(d.due_at)}</span></td>
                   </tr>
@@ -522,7 +522,7 @@ export function IntegrationsView({ onErr, embedded }) {
                       <div className="v"><b style={{ color: result.eligibility_score >= 80 ? "var(--sig)" : result.eligibility_score >= 50 ? "var(--warn)" : "var(--ok)" }}>{result.eligibility_score}</b><span>Ineligible</span></div>
                     </div>
                     <div>
-                      <span className={"badge " + (result.band === "likely_ineligible" ? "b-red" : result.band === "review" ? "b-amber" : "b-green")}><i className={"dot d-" + (result.band === "likely_ineligible" ? "red" : result.band === "review" ? "amber" : "green")} />{String(result.recommendation || "").replace(/_/g, " ")}</span>
+                      <span className={"badge " + (result.band === "likely_ineligible" ? "b-red" : result.band === "review" ? "b-amber" : "b-green")}><i className={"dot d-" + (result.band === "likely_ineligible" ? "red" : result.band === "review" ? "amber" : "green")} />{String(result.recommendation || "").replace(/_/g, " ").replace(/\b(idre|idr|qpa|nsa|cpt|drg|rbp|erisa|ncci|mue|tpa|hcpcs|npi|cms|hhs|dol|wc|ptp|mrf)\b/gi, m => m.toUpperCase())}</span>
                       <p className="muted" style={{ marginTop: 8, maxWidth: "26ch", fontSize: 12 }}>{result.disqualifying_fails} disqualifying · {result.warnings} warning(s). Same scoring as the stored-dispute engine.</p>
                     </div>
                   </div>
@@ -549,7 +549,7 @@ export function IntegrationsView({ onErr, embedded }) {
                 <tr key={i}>
                   <td className="mono" style={{ fontSize: 11 }}>{l.endpoint}</td>
                   <td><span className={"badge " + (l.status === 200 ? "b-green" : "b-red")}>{l.status}</span></td>
-                  <td className="muted" style={{ fontSize: 11 }}>{l.meta?.recommendation ? String(l.meta.recommendation).replace(/_/g, " ") : "—"}</td>
+                  <td className="muted" style={{ fontSize: 11 }}>{l.meta?.recommendation ? String(l.meta.recommendation).replace(/_/g, " ").replace(/\b(idre|idr|qpa|nsa|cpt|drg|rbp|erisa|ncci|mue|tpa|hcpcs|npi|cms|hhs|dol|wc|ptp|mrf)\b/gi, m => m.toUpperCase()) : "—"}</td>
                   <td className="mono" style={{ fontSize: 11 }}>{new Date(l.created_at).toLocaleString(undefined, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}</td>
                 </tr>
               ))}

@@ -44,7 +44,7 @@ export default function IdrPanel({ dispute }) {
         {conn
           ? <span className="badge" style={{ borderColor: "var(--line)" }}>
               <span className="dot" style={{ background: conn.status === "active" ? "var(--ok)" : "var(--warn)" }} />
-              {conn.adapter.replace(/_/g, " ")} · {conn.status}
+              {conn.adapter.replace(/_/g, " ").replace(/\b(idre|idr|qpa|nsa|cpt|drg|rbp|erisa|ncci|mue|tpa|hcpcs|npi|cms|hhs|dol|wc|ptp|mrf)\b/gi, m => m.toUpperCase())} · {conn.status}
             </span>
           : <button className="mini" disabled={busy}
               onClick={() => run(() => idr.connect("assisted_browser"))}>Connect Gateway</button>}
@@ -63,7 +63,7 @@ export default function IdrPanel({ dispute }) {
           : <div style={{ marginBottom: 8 }}>
               {events.map((ev) => (
                 <div key={ev.id} style={rowS}>
-                  <span className="badge b-grey" style={{ fontSize: 10 }}>{ev.kind.replace(/_/g, " ")}</span>
+                  <span className="badge b-grey" style={{ fontSize: 10 }}>{ev.kind.replace(/_/g, " ").replace(/\b(idre|idr|qpa|nsa|cpt|drg|rbp|erisa|ncci|mue|tpa|hcpcs|npi|cms|hhs|dol|wc|ptp|mrf)\b/gi, m => m.toUpperCase())}</span>
                   <div style={{ fontSize: 12.5 }}>
                     <b>{summarize(ev)}</b>
                     <span className="muted" style={{ display: "block", fontSize: 11 }}>
@@ -95,10 +95,10 @@ export default function IdrPanel({ dispute }) {
           : subs.map((s) => (
               <div key={s.id} style={{ ...rowS, alignItems: "center" }}>
                 <span className="badge" style={{ fontSize: 10, color: STATUS_TONE[s.status], borderColor: "var(--line)" }}>
-                  {s.status.replace(/_/g, " ")}
+                  {s.status.replace(/_/g, " ").replace(/\b(idre|idr|qpa|nsa|cpt|drg|rbp|erisa|ncci|mue|tpa|hcpcs|npi|cms|hhs|dol|wc|ptp|mrf)\b/gi, m => m.toUpperCase())}
                 </span>
                 <div style={{ flex: 1, fontSize: 12.5 }}>
-                  <b>{s.kind.replace(/_/g, " ")}</b>
+                  <b>{s.kind.replace(/_/g, " ").replace(/\b(idre|idr|qpa|nsa|cpt|drg|rbp|erisa|ncci|mue|tpa|hcpcs|npi|cms|hhs|dol|wc|ptp|mrf)\b/gi, m => m.toUpperCase())}</b>
                   {s.payload?.amount != null &&
                     <span className="mono" style={{ marginLeft: 8 }}>{money(s.payload.amount)}</span>}
                   {s.gateway_receipt?.confirmationNumber &&
@@ -137,7 +137,7 @@ function summarize(ev) {
   if (ev.kind === "determination_issued") return `determination: ${n.disposition || ev.raw_payload?.outcome || "issued"}`;
   if (ev.kind === "offer_recorded") return `${n.party || "party"} offer ${n.amount != null ? money(n.amount) : ""}`;
   if (ev.kind === "registry_updated") return `registration ${n.registration_no || ""}`;
-  return ev.kind.replace(/_/g, " ");
+  return ev.kind.replace(/_/g, " ").replace(/\b(idre|idr|qpa|nsa|cpt|drg|rbp|erisa|ncci|mue|tpa|hcpcs|npi|cms|hhs|dol|wc|ptp|mrf)\b/gi, m => m.toUpperCase());
 }
 
 const rowS = { display: "flex", gap: 11, alignItems: "flex-start", padding: "9px 0", borderBottom: "1px solid var(--hair)" };

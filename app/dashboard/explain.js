@@ -78,7 +78,7 @@ export function ExplainModal({ disputeId, onClose }) {
                         const pos = c >= 0;
                         return (
                           <div key={i} className="wfrow">
-                            <div className="wfl">{String(d.feature).replace(/_/g, " ")}</div>
+                            <div className="wfl">{String(d.feature).replace(/_/g, " ").replace(/\b(idre|idr|qpa|nsa|cpt|drg|rbp|erisa|ncci|mue|tpa|hcpcs|npi|cms|hhs|dol|wc|ptp|mrf)\b/gi, m => m.toUpperCase())}</div>
                             <div className="wftrack">
                               <div className="wfmid" />
                               <div className="wfbar" style={{ [pos ? "left" : "right"]: "50%", width: w + "%", background: pos ? "var(--c-sage)" : "var(--c-clay)" }} />
@@ -115,7 +115,7 @@ export function ExplainModal({ disputeId, onClose }) {
                   <div className="pb" style={{ padding: 0 }}>
                     {(qp.statutory_factors || []).map((f, i) => (
                       <div key={i} className="frow" style={{ alignItems: "flex-start" }}>
-                        <span className={"badge b-" + (FACTOR_TONE[f.status] || "grey")} style={{ marginTop: 1 }}>{String(f.status).replace(/_/g, " ")}</span>
+                        <span className={"badge b-" + (FACTOR_TONE[f.status] || "grey")} style={{ marginTop: 1 }}>{String(f.status).replace(/_/g, " ").replace(/\b(idre|idr|qpa|nsa|cpt|drg|rbp|erisa|ncci|mue|tpa|hcpcs|npi|cms|hhs|dol|wc|ptp|mrf)\b/gi, m => m.toUpperCase())}</span>
                         <div><b>{f.factor}</b><div className="sub">{f.note || f.requirement}</div></div>
                       </div>
                     ))}
@@ -131,7 +131,7 @@ export function ExplainModal({ disputeId, onClose }) {
                   return (
                     <div key={i} className="frow" style={{ alignItems: "flex-start" }}>
                       <span className={"mk " + cls}>{gl}</span>
-                      <div><b>{String(f.rule || "rule").replace(/_/g, " ")}</b>
+                      <div><b>{String(f.rule || "rule").replace(/_/g, " ").replace(/\b(idre|idr|qpa|nsa|cpt|drg|rbp|erisa|ncci|mue|tpa|hcpcs|npi|cms|hhs|dol|wc|ptp|mrf)\b/gi, m => m.toUpperCase())}</b>
                         <div className="sub">{f.detail}{f.confidence != null ? ` · confidence ${Math.round(Number(f.confidence) * 100)}%` : ""}</div></div>
                     </div>
                   );
@@ -147,7 +147,7 @@ export function ExplainModal({ disputeId, onClose }) {
                       <div key={i} className="tlitem">
                         <div className="tldot" data-agent={t.actor === "agent" ? "1" : "0"} />
                         <div className="tlbody">
-                          <div className="tltop"><b>{String(t.action || "").replace(/_/g, " ")}</b>
+                          <div className="tltop"><b>{String(t.action || "").replace(/_/g, " ").replace(/\b(idre|idr|qpa|nsa|cpt|drg|rbp|erisa|ncci|mue|tpa|hcpcs|npi|cms|hhs|dol|wc|ptp|mrf)\b/gi, m => m.toUpperCase())}</b>
                             <span className={"badge " + (t.actor === "agent" ? "b-amber" : "b-ink")}>{t.actor}</span>
                             <span className="muted mono" style={{ fontSize: 11, marginLeft: "auto" }}>{t.at ? new Date(t.at).toLocaleString(undefined, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }) : ""}</span>
                           </div>

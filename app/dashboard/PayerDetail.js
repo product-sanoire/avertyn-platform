@@ -54,7 +54,7 @@ export function PayerDetail({ planId, onBack, onOpenCase }) {
         <div>
           <h1 className="vh">{d.plan_name}</h1>
           <span className="sub">
-            {d.employer || "—"}{d.broker ? ` · Broker ${d.broker}` : ""} · {(d.plan_type || "").replace(/_/g, " ")}
+            {d.employer || "—"}{d.broker ? ` · Broker ${d.broker}` : ""} · {(d.plan_type || "").replace(/_/g, " ").replace(/\b(idre|idr|qpa|nsa|cpt|drg|rbp|erisa|ncci|mue|tpa|hcpcs|npi|cms|hhs|dol|wc|ptp|mrf)\b/gi, m => m.toUpperCase())}
           </span>
         </div>
         {fid && (
@@ -89,7 +89,7 @@ export function PayerDetail({ planId, onBack, onOpenCase }) {
             {Object.keys(phases).length === 0 ? <span className="muted" style={{ fontSize: 12.5 }}>No open cases.</span> :
               Object.entries(phases).sort((a, b) => b[1] - a[1]).map(([ws, c]) => (
                 <div key={ws} style={{ display: "flex", justifyContent: "space-between", fontSize: 12.5, padding: "2px 0", gap: 14 }}>
-                  <span className="muted">{ws.replace(/_/g, " ")}</span><b className="mono">{c}</b>
+                  <span className="muted">{ws.replace(/_/g, " ").replace(/\b(idre|idr|qpa|nsa|cpt|drg|rbp|erisa|ncci|mue|tpa|hcpcs|npi|cms|hhs|dol|wc|ptp|mrf)\b/gi, m => m.toUpperCase())}</span><b className="mono">{c}</b>
                 </div>
               ))}
           </div>
@@ -127,7 +127,7 @@ export function PayerDetail({ planId, onBack, onOpenCase }) {
                   <td className="mono" style={{ textAlign: "right" }}>{money(c.qpa)}</td>
                   <td className="mono" style={{ textAlign: "right" }}>{c.win == null ? "—" : pct(c.win)}</td>
                   <td className="mono" style={{ textAlign: "right" }}>{c.elig ?? "—"}</td>
-                  <td>{(c.phase || "").replace(/_/g, " ")}</td>
+                  <td>{(c.phase || "").replace(/_/g, " ").replace(/\b(idre|idr|qpa|nsa|cpt|drg|rbp|erisa|ncci|mue|tpa|hcpcs|npi|cms|hhs|dol|wc|ptp|mrf)\b/gi, m => m.toUpperCase())}</td>
                 </tr>
               ))}
             </tbody>

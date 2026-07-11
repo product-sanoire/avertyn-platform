@@ -377,7 +377,7 @@ function AuditView({ orgId, onErr }) {
                     <tr key={e.id}>
                       <td className="mono" style={{ fontSize: 11, whiteSpace: "nowrap" }}>{new Date(e.created_at).toLocaleString(undefined, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}</td>
                       <td className="mono" style={{ fontSize: 11 }}>{e.dispute_ref || "—"}</td>
-                      <td><span className="badge b-grey">{(e.action || "").replace(/_/g, " ")}</span></td>
+                      <td><span className="badge b-grey">{(e.action || "").replace(/_/g, " ").replace(/\b(idre|idr|qpa|nsa|cpt|drg|rbp|erisa|ncci|mue|tpa|hcpcs|npi|cms|hhs|dol|wc|ptp|mrf)\b/gi, m => m.toUpperCase())}</span></td>
                       <td className="muted" style={{ fontSize: 12 }}>{e.actor || "—"}</td>
                       <td style={{ fontSize: 12, maxWidth: 260 }}>{summarizeEffect(e.effect)}{Array.isArray(e.citations) && e.citations.length > 0 && <div className="mono" style={{ fontSize: 10.5, color: "var(--mut)" }}>{e.citations.join(" · ")}</div>}</td>
                       <td className="muted" style={{ fontSize: 11.5, maxWidth: 220 }}>{e.rationale || "—"}</td>
@@ -630,7 +630,7 @@ function GovernanceView({ orgId, onErr }) {
             <div className="pb" style={{ paddingTop: 12, display: "flex", gap: 6, flexWrap: "wrap" }}>
               {(gov.per_tenant_policy || []).map((p, i) => (
                 <span key={i} className={"badge " + (p.mode === "auto" ? "b-grey" : "b-amber")} style={{ padding: "5px 9px" }}>
-                  {(p.action || "").replace(/_/g, " ")} · {p.mode}{p.max_amount ? ` ≤ ${money(p.max_amount)}` : ""}
+                  {(p.action || "").replace(/_/g, " ").replace(/\b(idre|idr|qpa|nsa|cpt|drg|rbp|erisa|ncci|mue|tpa|hcpcs|npi|cms|hhs|dol|wc|ptp|mrf)\b/gi, m => m.toUpperCase())} · {p.mode}{p.max_amount ? ` ≤ ${money(p.max_amount)}` : ""}
                 </span>
               ))}
             </div>

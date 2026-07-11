@@ -106,7 +106,7 @@ export function PayersView({ orgId, onErr, onOpenCase }) {
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
                   <h3 style={{ margin: 0, fontFamily: "var(--disp)", fontSize: 19, fontWeight: 600, letterSpacing: "-.02em" }}>{p.plan_name}</h3>
-                  <span className="badge b-grey">{(p.plan_type || "").replace(/_/g, " ")}</span>
+                  <span className="badge b-grey">{(p.plan_type || "").replace(/_/g, " ").replace(/\b(idre|idr|qpa|nsa|cpt|drg|rbp|erisa|ncci|mue|tpa|hcpcs|npi|cms|hhs|dol|wc|ptp|mrf)\b/gi, m => m.toUpperCase())}</span>
                   <span className="badge" style={{ background: p.ceiling_mode ? "var(--accent-soft, #e2f0ef)" : "var(--sunk)", color: p.ceiling_mode ? "var(--accent-ink, #0a4c48)" : "var(--mut)" }}>
                     Ceiling: {ceilingLabel(p.ceiling_mode, p.ceiling_value, gp)}
                   </span>
@@ -199,7 +199,7 @@ export function PayersView({ orgId, onErr, onOpenCase }) {
                           <td style={{ padding: "9px 12px", ...num }}>{money(c.ceiling)}{c.above_bench && <i className="dot d-amber" title="Above regional benchmark" style={{ marginLeft: 5 }} />}</td>
                           <td style={{ padding: "9px 12px", ...num, fontWeight: 600 }}>{c.rec_offer != null ? money(c.rec_offer) : "—"}</td>
                           <td style={{ padding: "9px 12px", ...num }}>{c.win != null ? pct(c.win) : "—"}</td>
-                          <td style={{ padding: "9px 12px" }}><span className="muted">{(c.phase || "").replace(/_/g, " ")}</span></td>
+                          <td style={{ padding: "9px 12px" }}><span className="muted">{(c.phase || "").replace(/_/g, " ").replace(/\b(idre|idr|qpa|nsa|cpt|drg|rbp|erisa|ncci|mue|tpa|hcpcs|npi|cms|hhs|dol|wc|ptp|mrf)\b/gi, m => m.toUpperCase())}</span></td>
                           <td style={{ padding: "9px 12px", textAlign: "right" }}><button className="mini" onClick={() => onOpenCase && onOpenCase(c.id)}>Open →</button></td>
                         </tr>
                       ))}

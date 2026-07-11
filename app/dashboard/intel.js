@@ -270,7 +270,7 @@ function Counter({ disputeId, defaultOffer }) {
       <div className="il-cres" aria-live="polite">
         {res && (res._err
           ? <span className="il-err">error</span>
-          : <><span className={`il-pill ${tone}`}>{String(res.decision || "").replace(/_/g, " ")}</span> counter <b>{money(res.recommended_counter)}</b> · {res.rationale}</>)}
+          : <><span className={`il-pill ${tone}`}>{String(res.decision || "").replace(/_/g, " ").replace(/\b(idre|idr|qpa|nsa|cpt|drg|rbp|erisa|ncci|mue|tpa|hcpcs|npi|cms|hhs|dol|wc|ptp|mrf)\b/gi, m => m.toUpperCase())}</span> counter <b>{money(res.recommended_counter)}</b> · {res.rationale}</>)}
       </div>
     </>
   );
