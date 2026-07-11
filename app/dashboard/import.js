@@ -4,7 +4,22 @@
 import { useEffect, useState } from "react";
 import { supabase } from "../../lib/supabaseClient";
 
-const MODES = [["notice", "Notice · AI scan"], ["disputes", "Disputes · CSV"], ["edi", "Claims · EDI 837"], ["reference", "Org setup"], ["clearinghouse", "Clearinghouse"]];
+const MODES = [["notice", "Notice · AI scan"], ["remittance", "Remittance · JSON"], ["disputes", "Disputes · CSV"], ["edi", "Claims · EDI 837"], ["reference", "Org setup"], ["clearinghouse", "Clearinghouse"]];
+const REMIT_SAMPLE = JSON.stringify({
+  payer_name: "Acme Health Plan",
+  payer_registration_number: "TIN-99-0001",
+  plan_legal_name: "Acme Self-Funded PPO",
+  sponsor_legal_name: "Acme Corp",
+  remit_ref: "EOB-2026-0142",
+  remit_date: "2026-07-01",
+  provider_name: "Metro Emergency Physicians",
+  lines: [
+    { cpt: "99285", billed: "3200", paid: "640", qpa: "820", carc: "45", rarc: "N864", service_category: "emergency", service_date: "2026-06-15" },
+    { cpt: "A0431", billed: "41000", paid: "9500", qpa: "12800", carc: "45", rarc: "N866", service_category: "air_ambulance", service_date: "2026-06-16", provider_name: "SkyLift Air" },
+    { cpt: "99284", billed: "2100", paid: "500", qpa: "610", carc: "45", rarc: "N867", service_category: "emergency", service_date: "2026-06-17" },
+    { cpt: "80053", billed: "120", paid: "95", carc: "1", rarc: "", service_category: "lab", service_date: "2026-06-17" },
+  ],
+}, null, 2);
 const DISPUTE_COLS = ["external_ref", "initiator", "plan", "cpt_code", "service_date", "billed_amount", "demand_amount", "qpa_amount", "workflow_state", "carc", "rarc"];
 const SAMPLE = `external_ref,initiator,plan,cpt_code,service_date,billed_amount,demand_amount,qpa_amount,workflow_state
 IDR-30001,HaloMD,Acme Mfg PPO,70553,2026-05-12,7200,5880,1010,eligibility_review
@@ -43,6 +58,9 @@ export function ImportHub({ orgId, onErr, onClose, onDone }) {
   const [plans, setPlans] = useState([]);
   const [plan, setPlan] = useState("");
   const [edi, setEdi] = useState("");
+  // remittance JSON
+  const [remit, setRemit] = useState("");
+  const [remitPlan, setRemitPlan] = useState("");
   // reference
   const [refKind, setRefKind] = useState("plans");
   const [refCsv, setRefCsv] = useState("");
@@ -77,6 +95,16 @@ export function ImportHub({ orgId, onErr, onClose, onDone }) {
     const { data, error } = await supabase.rpc("ingest_x12_837", { p_org: orgId, p_plan: plan || null, p_raw: edi });
     if (error) throw error;
     return { kind: "edi", ...(typeof data === "object" ? data : { result: data }) };
+  });
+  const intakeRemittance = () => run(async () => {
+    let payload;
+    try { payload = JSON.parse(remit); }
+    catch (e) { throw new Error("Invalid JSON — check the payload and try again."); }
+    if (!payload || !Array.isArray(payload.lines) || payload.lines.length === 0)
+      throw new Error('Payload needs a "lines" array with at least one line.');
+    const { data, error } = await supabase.rpc("intake_remittance", { p_payload: payload, p_plan: remitPlan || null });
+    if (error) throw error;
+    return { kind: "remittance", ...(typeof data === "object" ? data : { result: data }) };
   });
   const importRef = () => run(async () => {
     const { rows } = parseCSV(refCsv);
@@ -197,6 +225,26 @@ export function ImportHub({ orgId, onErr, onClose, onDone }) {
             </div>
           )}
 
+          {mode === "remittance" && (
+            <div>
+              <p className="muted" style={{ marginTop: 0 }}>Paste a payer <b>remittance / EOB</b> as JSON (one payload, many lines). Each line is classified by its <span className="mono" style={{ fontSize: 11 }}>CARC/RARC</span> and routed by No Surprises Act rule — lines that land in <b>federal IDR</b>, <b>air-ambulance IDR</b>, or <b>state IDR</b> auto-open a pre-filled dispute with the eligibility engine already run. Non-actionable lines (e.g. in-network, patient-responsibility) are recorded but no case is opened.</p>
+              <div style={{ display: "flex", gap: 8, marginBottom: 8, alignItems: "center", flexWrap: "wrap" }}>
+                <button className="mini" onClick={() => setRemit(REMIT_SAMPLE)}>Load sample</button>
+                <label className="mini" style={{ cursor: "pointer" }}>Upload .json<input type="file" accept=".json,application/json" style={{ display: "none" }} onChange={(e) => readFile(e, setRemit)} /></label>
+                <span style={{ marginLeft: "auto", display: "flex", gap: 6, alignItems: "center" }}>
+                  <span className="rlabel" style={{ margin: 0 }}>Attach to plan</span>
+                  <select className="dsel" value={remitPlan} onChange={(e) => setRemitPlan(e.target.value)} style={{ padding: "8px 10px", minWidth: 190 }}>
+                    <option value="">— auto / first plan —</option>
+                    {plans.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+                  </select>
+                </span>
+              </div>
+              <textarea style={ta} value={remit} onChange={(e) => setRemit(e.target.value)} placeholder={REMIT_SAMPLE} />
+              <p className="muted" style={{ fontSize: 11, marginTop: 6 }}>Line fields: <span className="mono">cpt, billed, paid, qpa, carc, rarc, service_category, service_date, provider_name</span> (provider defaults to the payload-level provider). Idempotent — re-running the same remittance won&apos;t duplicate cases.</p>
+              <button className="btn btn-a" style={{ marginTop: 12 }} disabled={busy || !remit.trim()} onClick={intakeRemittance}>{busy ? "Processing…" : "Ingest remittance"}</button>
+            </div>
+          )}
+
           {mode === "disputes" && (
             <div>
               <p className="muted" style={{ marginTop: 0 }}>Paste or upload a CSV. Header row expected — recognized columns: <span className="mono" style={{ fontSize: 11 }}>{DISPUTE_COLS.join(", ")}</span>. Each row creates a dispute and runs the eligibility engine.</p>
@@ -270,6 +318,12 @@ export function ImportHub({ orgId, onErr, onClose, onDone }) {
                 {result.kind === "disputes" && <><span className="badge b-green"><i className="dot d-green" />{result.created} disputes created &amp; scored</span>{result.failed > 0 && <span className="badge b-red"><i className="dot d-red" />{result.failed} failed</span>}</>}
                 {result.kind === "reference" && <span className="badge b-green"><i className="dot d-green" />{result.imported} {result.kind_label || result.kind} imported</span>}
                 {result.kind === "edi" && <span className="badge b-green"><i className="dot d-green" />837 ingested{result.disputes ? ` · ${result.disputes} disputes` : ""}</span>}
+                {result.kind === "remittance" && <>
+                  <span className="badge b-green"><i className="dot d-green" />{result.lines ?? 0} lines ingested</span>
+                  <span className="badge b-ink">{result.disputes_created ?? 0} disputes auto-created</span>
+                  {result.nsa_eligible > 0 && <span className="badge b-amber"><i className="dot d-amber" />{result.nsa_eligible} NSA-eligible</span>}
+                  {result.routing && Object.entries(result.routing).map(([k, v]) => <span key={k} className="badge b-grey">{k.replace(/_/g, " ")}: {v}</span>)}
+                </>}
                 {result.kind === "clearinghouse" && <span className="badge b-amber"><i className="dot d-amber" />{result.provider} connection saved · {result.status}</span>}
                 {Array.isArray(result.errors) && result.errors.length > 0 && <span className="muted" style={{ fontSize: 11 }}>{result.errors.slice(0, 2).map((e) => e.error).join("; ")}</span>}
               </div>

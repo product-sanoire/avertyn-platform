@@ -93,6 +93,8 @@ export default function ProgramsPage() {
           <ModuleCard t={MODULES.erisa_fiduciary} rows={[["Plans", kpi("erisa_fiduciary").plans_assessed || 0], ["Compliance", pct(kpi("erisa_fiduciary").avg_score)], ["Open gaps", kpi("erisa_fiduciary").open_gaps || 0]]} />
         </div>
 
+        <RbpRunner onDone={() => { loadDash(); loadCases(tab); }} onErr={setErr} />
+
         <EditsImporter cov={cov} onDone={loadDash} />
 
         {/* ---- Bill-review case queue ---- */}
@@ -178,28 +180,57 @@ function ModuleCard({ t, rows, note }) {
 }
 
 function CaseDetail({ sel }) {
+  const caseId = sel?.case?.id;
   const lines = sel.lines || [], adj = sel.adjustments || [];
+  const [docs, setDocs] = useState([]);
   const [busy, setBusy] = useState(false);
-  const [lerr, setLerr] = useState("");
-  async function genLetter() {
-    setBusy(true); setLerr("");
-    const { data, error } = await supabase.rpc("render_review_determination", { p_case: sel.case.id });
+  const [preview, setPreview] = useState(null); // { title, html }
+  const [cErr, setCErr] = useState("");
+
+  const loadDocs = useCallback(async () => {
+    if (!caseId) return;
+    const { data } = await supabase.rpc("list_review_documents", { p_case: caseId });
+    setDocs(data || []);
+  }, [caseId]);
+  useEffect(() => { loadDocs(); }, [loadDocs]);
+
+  async function generate() {
+    setBusy(true); setCErr("");
+    try {
+      const { data, error } = await supabase.rpc("save_review_determination", { p_case: caseId });
+      if (error) throw error;
+      if (!data?.ok) { setCErr(data?.reason || "Could not generate the letter."); setBusy(false); return; }
+      setPreview({ title: data.title, html: data.html });
+      await loadDocs();
+    } catch (e) { setCErr(e.message); }
     setBusy(false);
-    if (error || !data || !data.ok) { setLerr(error ? error.message : "Could not generate letter"); return; }
-    const w = window.open("", "_blank");
-    if (!w) { setLerr("Pop-up blocked — allow pop-ups to open the letter."); return; }
-    w.document.write('<!doctype html><html><head><meta charset="utf-8"><title>' + (data.title || "Determination") +
-      '</title><style>body{font-family:Georgia,serif;max-width:720px;margin:40px auto;padding:0 24px;line-height:1.55;color:#1a1a1a}.doc-meta{color:#666;font-size:13px}.sig{margin-top:6px}ul{margin:6px 0}</style></head><body>' +
-      data.html + '</body></html>');
-    w.document.close();
   }
+  async function viewDoc(id) {
+    setCErr("");
+    const { data, error } = await supabase.from("review_documents").select("title, content").eq("id", id).single();
+    if (error) { setCErr(error.message); return; }
+    setPreview({ title: data.title, html: data.content || "" });
+  }
+  async function signDoc(id) {
+    setCErr("");
+    try {
+      const { data, error } = await supabase.rpc("sign_review_document", { p_id: id });
+      if (error) throw error;
+      if (!data?.ok) { setCErr(data?.reason === "already_signed" ? "Already signed." : (data?.reason || "Could not sign.")); return; }
+      await loadDocs();
+    } catch (e) { setCErr(e.message); }
+  }
+  function downloadPreview() {
+    if (!preview) return;
+    const html = `<!doctype html><html><head><meta charset="utf-8"><title>${preview.title}</title></head><body>${preview.html}</body></html>`;
+    const blob = new Blob([html], { type: "text/html" }); const url = URL.createObjectURL(blob);
+    const a = document.createElement("a"); a.href = url; a.download = (preview.title || "determination") + ".html"; a.click();
+    setTimeout(() => URL.revokeObjectURL(url), 1500);
+  }
+
   return (
     <div style={{ background: "var(--paper2,#faf8f6)", border: "1px solid var(--hair,#eee)", borderRadius: 8, padding: 12, margin: "4px 0 12px" }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
-        <div className="muted" style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: ".05em" }}>Lines</div>
-        <button className="btn btn-s" disabled={busy} onClick={genLetter}>{busy ? "Generating…" : "Generate determination letter"}</button>
-      </div>
-      {lerr && <div className="badge b-red" style={{ marginBottom: 6, display: "inline-flex", gap: 8 }}><i className="dot d-red" />{lerr}</div>}
+      <div className="muted" style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: ".05em", marginBottom: 6 }}>Lines</div>
       {lines.map((l) => (
         <div key={l.id} className="ver-row" style={{ fontSize: 12.5 }}>
           <span className="code-in">{l.code_system} {l.code}</span>
@@ -219,6 +250,106 @@ function CaseDetail({ sel }) {
           {a.authority && <div className="muted" style={{ fontSize: 11, marginTop: 2 }}>{a.authority}{a.confidence != null ? ` · confidence ${Math.round(a.confidence * 100)}%` : ""}</div>}
         </div>
       ))}
+
+      {/* Determination letter — render from the template engine and persist a versioned, hash-sealed copy */}
+      <div style={{ marginTop: 12, paddingTop: 10, borderTop: "1px solid var(--hair,#eee)", display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+        <span className="muted" style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: ".05em" }}>Determination letter</span>
+        <button className="btn btn-a" style={{ padding: "6px 12px", fontSize: 12 }} disabled={busy} onClick={generate}>{busy ? "Generating…" : "Generate & save"}</button>
+        {docs.length > 0 && <span className="muted" style={{ fontSize: 11 }}>{docs.length} saved version{docs.length === 1 ? "" : "s"}</span>}
+      </div>
+      {cErr && <div className="badge b-red" style={{ marginTop: 8, display: "inline-flex", gap: 8 }}><i className="dot d-red" />{cErr}</div>}
+      {docs.map((d) => (
+        <div key={d.id} className="ver-row" style={{ fontSize: 12, alignItems: "baseline" }}>
+          <span className={"badge b-" + (d.esign_status === "signed" ? "green" : "grey")}><i className={"dot d-" + (d.esign_status === "signed" ? "green" : "grey")} />{d.esign_status}</span>
+          <span style={{ marginLeft: 8 }}>{d.title}</span>
+          <span style={{ flex: 1 }} />
+          <span className="muted" style={{ fontSize: 11, fontFamily: "var(--num,monospace)" }} title={"sha256 " + d.sha256}>{(d.sha256 || "").slice(0, 8)}</span>
+          {d.esign_status === "signed" && d.signed_by && <span className="muted" style={{ fontSize: 11, marginLeft: 8 }} title={d.signed_at ? new Date(d.signed_at).toLocaleString() : ""}>✍ {d.signed_by}</span>}
+          <span className="muted" style={{ fontSize: 11, marginLeft: 8 }}>{new Date(d.created_at).toLocaleDateString()}</span>
+          <button className="mini" style={{ marginLeft: 8 }} onClick={() => viewDoc(d.id)}>View</button>
+          {d.esign_status !== "signed" && <button className="mini" style={{ marginLeft: 6 }} onClick={() => signDoc(d.id)}>Sign</button>}
+        </div>
+      ))}
+      {preview && (
+        <div className="panel" style={{ marginTop: 10 }}>
+          <div className="ph" style={{ fontSize: 13 }}>{preview.title}
+            <span className="act"><button className="mini" onClick={downloadPreview}>Download .html</button><button className="mini" style={{ marginLeft: 6 }} onClick={() => setPreview(null)}>Close</button></span>
+          </div>
+          <iframe title="determination-preview" srcDoc={preview.html} style={{ width: "100%", height: 420, border: 0, background: "#fff", borderRadius: 8 }} />
+        </div>
+      )}
+    </div>
+  );
+}
+
+// Run reference-based-pricing on an open dispute: reprices its CPT to Nx Medicare via the org's RBP
+// schedule, writes a repricer determination + a bill-review case (which then shows in the queue above),
+// and can optionally push an RBP-supported plan offer into open negotiation.
+function RbpRunner({ onDone, onErr }) {
+  const [open, setOpen] = useState(false);
+  const [disputes, setDisputes] = useState([]);
+  const [schedules, setSchedules] = useState([]);
+  const [disp, setDisp] = useState("");
+  const [sched, setSched] = useState("");
+  const [makeOffer, setMakeOffer] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [res, setRes] = useState(null);
+  const [err, setErr] = useState("");
+
+  useEffect(() => {
+    if (!open) return;
+    supabase.from("disputes").select("id, external_ref, cpt_code, billed_amount").eq("disposition", "open").order("created_at", { ascending: false }).limit(100).then(({ data }) => setDisputes(data || []));
+    supabase.from("rbp_schedules").select("id, name").eq("active", true).then(({ data }) => setSchedules(data || []));
+  }, [open]);
+
+  async function run() {
+    if (!disp) return;
+    setBusy(true); setRes(null); setErr("");
+    try {
+      const { data, error } = await supabase.rpc("run_rbp_repricing", { p_dispute_id: disp, p_schedule_id: sched || null, p_make_offer: makeOffer });
+      if (error) throw error;
+      setRes(data);
+      if (onDone) await onDone();
+    } catch (e) { setErr(e.message || String(e)); if (onErr) onErr(e.message); }
+    setBusy(false);
+  }
+
+  return (
+    <div className="panel" style={{ marginTop: 12 }}>
+      <div className="ph">RBP repricing
+        <span className="act" style={{ display: "flex", gap: 10, alignItems: "center" }}>
+          <span className="muted" style={{ fontSize: 12 }}>reference-based price → defensible allowed amount</span>
+          <button className="btn btn-s" onClick={() => setOpen((v) => !v)}>{open ? "Close" : "Run repricing"}</button>
+        </span>
+      </div>
+      {open && (
+        <div className="pb" style={{ paddingTop: 12 }}>
+          <div className="muted" style={{ fontSize: 12, marginBottom: 10 }}>
+            Pick an open dispute; Avertyn reprices its CPT against Medicare via your RBP schedule and opens a bill-review
+            case (shown in the queue above). CPT must have a Medicare reference rate loaded.
+          </div>
+          <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
+            <select className="btn btn-s" value={disp} onChange={(e) => setDisp(e.target.value)} style={{ minWidth: 220 }}>
+              <option value="">Choose open dispute…</option>
+              {disputes.map((d) => <option key={d.id} value={d.id}>#{d.external_ref} · {d.cpt_code || "—"} · {money(d.billed_amount)}</option>)}
+            </select>
+            <select className="btn btn-s" value={sched} onChange={(e) => setSched(e.target.value)} style={{ minWidth: 180 }}>
+              <option value="">Org default schedule</option>
+              {schedules.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+            </select>
+            <label style={{ display: "inline-flex", gap: 6, alignItems: "center", fontSize: 12.5, color: "var(--mut,#666)" }}>
+              <input type="checkbox" checked={makeOffer} onChange={(e) => setMakeOffer(e.target.checked)} />push open-negotiation offer
+            </label>
+            <button className="btn btn-a" disabled={busy || !disp} onClick={run}>{busy ? "Repricing…" : "Reprice"}</button>
+          </div>
+          {err && <div className="badge b-red" style={{ marginTop: 10, display: "inline-flex", gap: 8 }}><i className="dot d-red" />{err}</div>}
+          {res && !err && (
+            <div className="badge b-green" style={{ marginTop: 10, display: "inline-flex", gap: 8, alignItems: "center" }}>
+              <i className="dot d-green" />Repriced to {money(res.repriced_amount)} (base {money(res.base_rate)}) · billed {money(res.billed)} · save {money(res.savings)}{res.offer ? " · offer pushed" : ""} — opened in bill review
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }
