@@ -104,6 +104,18 @@ export default function Dashboard() {
   const [dispQuery, setDispQuery] = useState("");
   const [briefFilter, setBriefFilter] = useState("all");   // all | draft | in_review | approved | filed | sealed | none
   const [phaseFilter, setPhaseFilter] = useState("all");   // all | open_negotiation | idr
+  const [listOpen, setListOpen] = useState(true);          // left case-list rail collapse
+  const [railOpen, setRailOpen] = useState(true);          // right autopilot panel collapse
+  useEffect(() => {
+    try {
+      const s = JSON.parse(localStorage.getItem("avertyn.panes") || "{}");
+      if (typeof s.list === "boolean") setListOpen(s.list);
+      if (typeof s.rail === "boolean") setRailOpen(s.rail);
+    } catch {}
+  }, []);
+  useEffect(() => {
+    try { localStorage.setItem("avertyn.panes", JSON.stringify({ list: listOpen, rail: railOpen })); } catch {}
+  }, [listOpen, railOpen]);
   const [selected, setSelected] = useState(() => new Set());
   const [busy, setBusy] = useState("");
   const [verify, setVerify] = useState(null);
@@ -530,9 +542,12 @@ export default function Dashboard() {
               <button className="mini" onClick={() => downloadCSV("avertyn-disputes.csv", displayed, DISPUTE_CSV_COLS)}>Export CSV</button>
             </div>
           </div>
-          <div className="work" style={{ flex: 1 }}>
-          <div className="list">
-            <div className="lhdr"><b>{tabHeader}</b><span className="ct">{displayed.length}</span></div>
+          <div className={"work" + (listOpen ? "" : " list-collapsed") + (railOpen ? "" : " rail-collapsed")} style={{ flex: 1 }}>
+          <div className={"list" + (listOpen ? "" : " collapsed")}>
+            {listOpen ? (<>
+            <div className="lhdr"><b>{tabHeader}</b><span className="ct">{displayed.length}</span>
+              <button className="pane-toggle" title="Collapse case list" aria-label="Collapse case list" onClick={() => setListOpen(false)}>«</button>
+            </div>
             {displayed.length === 0
               ? <p className="muted" style={{ padding: 16 }}>Nothing here right now.</p>
               : displayed.map((r) => {
@@ -576,12 +591,19 @@ export default function Dashboard() {
                     </div>
                   );
                 })}
+            </>) : (
+              <button className="pane-reopen" title="Show case list" aria-label="Show case list" onClick={() => setListOpen(true)}><span className="chev">»</span><span className="vlabel">Cases</span></button>
+            )}
           </div>
           <div className="detail">
             {!detail ? <p className="muted">Select a dispute…</p> : <Detail dd={detail} onRun={runEngine} onDoc={genLetter} onOpenNeg={openNeg} onAction={caseAction} onStageMoney={stageMoney} onView={setDocView} onExplain={() => setExplainId(sel)} onChanged={() => { loadDetail(sel); loadShell(); }} busy={busy} />}
           </div>
-          <div className="rail">
-            <div className="rlabel">Autopilot · governed</div>
+          <div className={"rail" + (railOpen ? "" : " collapsed")}>
+            {railOpen ? (<>
+            <div className="rlabel" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
+              <span>Autopilot · governed</span>
+              <button className="pane-toggle" title="Collapse autopilot panel" aria-label="Collapse autopilot panel" onClick={() => setRailOpen(false)}>»</button>
+            </div>
             <div className="rcard">
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
                 <b style={{ fontFamily: "var(--disp)", fontSize: 15 }}>Agent</b>
@@ -627,6 +649,9 @@ export default function Dashboard() {
             <div className="rcard"><div className="feed">
               {feed.map((e, i) => <div key={i}>{e.actor === "agent" ? "✦" : "•"} <b>{e.action_type}</b> · {e.actor}{e.rationale ? " — " + e.rationale.slice(0, 60) : ""}</div>)}
             </div></div>
+            </>) : (
+              <button className="pane-reopen" title="Show autopilot panel" aria-label="Show autopilot panel" onClick={() => setRailOpen(true)}><span className="chev">«</span><span className="vlabel">Autopilot</span></button>
+            )}
           </div>
         </div>
         </div>
@@ -1108,4 +1133,3 @@ function DocModal({ doc, onClose }) {
     </div>
   );
 }
-                                                                                                                                                                       
