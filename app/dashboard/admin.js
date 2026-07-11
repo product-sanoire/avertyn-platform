@@ -15,7 +15,7 @@ const METRICS = [["count", "Dispute count"], ["defended", "Dollars defended"], [
 const DIMS = [["initiator", "Initiator"], ["plan", "Plan"], ["state", "Workflow state"], ["cpt", "CPT"], ["month", "Month"]];
 const CADENCE = ["hourly", "daily", "weekly", "monthly"];
 const SCIM_BASE = (process.env.NEXT_PUBLIC_SUPABASE_URL || "https://ssjougrsaecdwfuxeasd.supabase.co") + "/functions/v1/scim";
-const ADMIN = [["access", "Access"], ["reports", "Reports"], ["model", "Model"], ["audit", "Audit"], ["alerts", "Alerts"], ["qpa", "QPA index"], ["ceilings", "Ceilings"], ["integrations", "Integrations"], ["api", "API"], ["webhooks", "Webhooks"]];
+const ADMIN = [["roi", "ROI"], ["access", "Access"], ["reports", "Reports"], ["model", "Model"], ["governance", "Governance"], ["audit", "Audit"], ["alerts", "Alerts"], ["qpa", "QPA index"], ["ceilings", "Ceilings"], ["integrations", "Integrations"], ["api", "API"], ["webhooks", "Webhooks"]];
 
 async function sha256Hex(s) {
   const b = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(s));
@@ -40,9 +40,11 @@ export function AdminView({ orgId, onErr }) {
           {ADMIN.map(([k, l]) => <button key={k} className={seg === k ? "on" : ""} onClick={() => setSeg(k)}>{l}</button>)}
         </div>
       </div>
-      {seg === "access" ? <AccessView orgId={orgId} onErr={onErr} />
+      {seg === "roi" ? <RoiView orgId={orgId} onErr={onErr} />
+        : seg === "access" ? <AccessView orgId={orgId} onErr={onErr} />
         : seg === "reports" ? <ReportsView orgId={orgId} onErr={onErr} />
         : seg === "model" ? <ModelView orgId={orgId} onErr={onErr} />
+        : seg === "governance" ? <GovernanceView orgId={orgId} onErr={onErr} />
         : seg === "webhooks" ? <WebhooksView orgId={orgId} onErr={onErr} />
         : seg === "audit" ? <AuditView orgId={orgId} onErr={onErr} />
         : seg === "alerts" ? <DeadlinesView orgId={orgId} onErr={onErr} embedded />
@@ -519,6 +521,199 @@ function QpaIndexView({ onErr }) {
   );
 }
 
+// ============================================================ Governance & SLA oversight
+function GovernanceView({ orgId, onErr }) {
+  const [gov, setGov] = useState(null);
+  const [sla, setSla] = useState(null);
+  const [busy, setBusy] = useState(false);
+  const [note, setNote] = useState("");
+
+  const load = useCallback(async () => {
+    if (!orgId) return;
+    try {
+      const [{ data: g, error: e1 }, { data: s }] = await Promise.all([
+        supabase.rpc("ai_governance_report", { p_org: orgId }),
+        supabase.rpc("sla_status", { p_org: orgId }),
+      ]);
+      if (e1) throw e1;
+      setGov(g || null); setSla(s || null);
+    } catch (e) { onErr(e.message); }
+  }, [orgId, onErr]);
+  useEffect(() => { load(); }, [load]);
+
+  async function escalate() {
+    setBusy(true); setNote("");
+    try { const { data, error } = await supabase.rpc("sla_escalate", { p_org: orgId }); if (error) throw error; setNote(`Escalated ${data?.escalated ?? 0} overdue deadline(s).`); await load(); }
+    catch (e) { onErr(e.message); }
+    setBusy(false);
+  }
+
+  const tile = (label, val, hint, tone) => <div className="kpi-tile"><div className="l">{label}</div><div className="n" style={{ fontFamily: "var(--num,monospace)", color: tone }}>{val}</div>{hint && <div className="goal">{hint}</div>}</div>;
+  const a = gov?.automation || {}, ex = gov?.explainability || {}, ho = gov?.human_oversight || {};
+
+  return (
+    <div>
+      {/* SLA risk */}
+      <div className="panel">
+        <div className="ph">Deadline SLA risk
+          <span className="act" style={{ display: "flex", gap: 8, alignItems: "center" }}>
+            {note && <span className="badge b-green"><i className="dot d-green" />{note}</span>}
+            <button className="btn btn-a" style={{ padding: "6px 12px" }} disabled={busy || !sla || (sla.overdue || 0) === 0} onClick={escalate}>{busy ? "Escalating…" : "Escalate overdue"}</button>
+          </span>
+        </div>
+        <div className="pb" style={{ paddingTop: 12 }}>
+          <div className="cards" style={{ marginBottom: 4 }}>
+            {tile("Overdue", sla?.overdue ?? "—", "past due — act now", (sla?.overdue || 0) > 0 ? "var(--sig,#a8321f)" : undefined)}
+            {tile("Urgent", sla?.urgent ?? "—", "≤ 3 business days")}
+            {tile("Soon", sla?.soon ?? "—", "≤ 7 days")}
+          </div>
+          {(sla?.items || []).length > 0 && (
+            <div style={{ overflow: "auto", maxHeight: 260, marginTop: 8 }}>
+              <table>
+                <thead><tr><th>Case</th><th>Deadline</th><th>Due</th><th>Urgency</th></tr></thead>
+                <tbody>
+                  {sla.items.map((it, i) => {
+                    const tone = it.urgency === "overdue" ? "red" : it.urgency === "urgent" ? "amber" : "grey";
+                    return (
+                      <tr key={i}>
+                        <td className="mono" style={{ fontSize: 11 }}>{it.dispute_ref}</td>
+                        <td style={{ fontSize: 12.5 }}>{it.label}</td>
+                        <td className="mono" style={{ fontSize: 11, whiteSpace: "nowrap" }}>{new Date(it.due_at).toLocaleString(undefined, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}</td>
+                        <td><span className={"badge b-" + tone}><i className={"dot d-" + tone} />{it.urgency}</span></td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* AI governance */}
+      {gov && (
+        <>
+          <div className="panel">
+            <div className="ph">AI governance<span className="act"><span className="muted" style={{ fontSize: 11 }}>NAIC / NIST model-risk posture</span></span></div>
+            <div className="pb" style={{ paddingTop: 12 }}>
+              <p className="muted" style={{ fontSize: 12.5, margin: "0 0 12px" }}>Every automated action is governed, logged with rationale and legal citations, and reversible under human control — the answers procurement&apos;s AI-governance review asks for.</p>
+              <div className="cards">
+                {tile("Automated", a.by_agent ?? 0, `of ${a.total_actions ?? 0} actions`)}
+                {tile("Human-run", a.by_human ?? 0, "manual actions")}
+                {tile("Ledger integrity", ex.ledger_integrity?.ok ? "intact" : `${ex.ledger_integrity?.mismatches ?? "?"} bad`, `${ex.ledger_integrity?.rows ?? 0} rows`, ex.ledger_integrity?.ok ? "var(--ok,#2e7d32)" : "var(--sig,#a8321f)")}
+                {tile("With citations", ex.actions_with_citations ?? 0, "explainable")}
+                {tile("With rationale", ex.actions_with_rationale ?? 0, "documented")}
+                {tile("Override rate", (ho.override_rate_pct ?? 0) + "%", `${ho.approvals_total ?? 0} approvals`)}
+              </div>
+            </div>
+          </div>
+
+          <div className="panel">
+            <div className="ph">Fairness check<span className="act"><span className="muted" style={{ fontSize: 11 }}>challenge rate by initiator — watch for disparate treatment</span></span></div>
+            <table>
+              <thead><tr><th>Initiator</th><th>Disputes</th><th>Challenged</th><th>Rate</th></tr></thead>
+              <tbody>
+                {(gov.fairness_check || []).map((f, i) => (
+                  <tr key={i}>
+                    <td><b>{f.initiator}</b></td>
+                    <td className="mono">{f.disputes}</td>
+                    <td className="mono">{f.challenged}</td>
+                    <td className="mono">{f.challenge_rate_pct}%</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          <div className="panel">
+            <div className="ph">Autonomy policy<span className="act"><span className="muted" style={{ fontSize: 11 }}>per-action mode — auto vs human review</span></span></div>
+            <div className="pb" style={{ paddingTop: 12, display: "flex", gap: 6, flexWrap: "wrap" }}>
+              {(gov.per_tenant_policy || []).map((p, i) => (
+                <span key={i} className={"badge " + (p.mode === "auto" ? "b-grey" : "b-amber")} style={{ padding: "5px 9px" }}>
+                  {(p.action || "").replace(/_/g, " ")} · {p.mode}{p.max_amount ? ` ≤ ${money(p.max_amount)}` : ""}
+                </span>
+              ))}
+            </div>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+// ============================================================ ROI (CFO view)
+function RoiView({ orgId, onErr }) {
+  const [roi, setRoi] = useState(null);
+  const [busy, setBusy] = useState(false);
+  const [note, setNote] = useState("");
+
+  const load = useCallback(async () => {
+    if (!orgId) return;
+    try { const { data, error } = await supabase.rpc("roi_summary", { p_org: orgId }); if (error) throw error; setRoi(data); }
+    catch (e) { onErr(e.message); }
+  }, [orgId, onErr]);
+  useEffect(() => { load(); }, [load]);
+
+  async function scheduleMonthly() {
+    setBusy(true); setNote("");
+    try {
+      const { error } = await supabase.from("scheduled_reports").insert({ org_id: orgId, name: "Monthly ROI — dollars defended", metric: "defended", dim: "month", cadence: "monthly", recipients: "" });
+      if (error) throw error;
+      setNote("Scheduled — set recipients under Reports.");
+    } catch (e) { onErr(e.message); }
+    setBusy(false);
+  }
+
+  const pct = (v) => v == null ? "—" : (Number(v) <= 1 ? Math.round(Number(v) * 100) : Math.round(Number(v))) + "%";
+  const tile = (label, val, hint) => <div className="kpi-tile"><div className="l">{label}</div><div className="n" style={{ fontFamily: "var(--num,monospace)" }}>{val}</div>{hint && <div className="goal">{hint}</div>}</div>;
+
+  if (!roi) return <p className="muted">Loading…</p>;
+  const trend = roi.defended_trend || [];
+  const mx = Math.max(1, ...trend.map((p) => Number(p.value) || 0));
+
+  return (
+    <div>
+      <div className="panel">
+        <div className="ph">Return on Avertyn
+          <span className="act" style={{ display: "flex", gap: 8, alignItems: "center" }}>
+            {note && <span className="badge b-green"><i className="dot d-green" />{note}</span>}
+            <button className="btn btn-s" style={{ padding: "6px 12px" }} disabled={busy} onClick={scheduleMonthly}>Schedule monthly</button>
+          </span>
+        </div>
+        <div className="pb" style={{ paddingTop: 14 }}>
+          <div style={{ display: "flex", alignItems: "baseline", gap: 12, flexWrap: "wrap", marginBottom: 12 }}>
+            <div style={{ fontSize: 34, fontWeight: 700, fontFamily: "var(--num,monospace)" }}>{money(roi.dollars_defended)}</div>
+            <div className="muted" style={{ fontSize: 13 }}>defended against {money(roi.total_demand)} in provider demand · {money(roi.cost_avoided_per_dispute)}/dispute avoided</div>
+          </div>
+          <div className="cards">
+            {tile("At risk vs QPA", money(roi.at_risk_vs_qpa), "exposure defended")}
+            {tile("Settled vs demand", pct(roi.avg_settled_pct_of_demand), "lower is better")}
+            {tile("Plan-win rate", pct(roi.plan_win_rate), `${roi.resolved} resolved`)}
+            {tile("Ineligible caught", roi.ineligible_caught, pct(roi.ineligible_caught_rate) + " of cases")}
+            {tile("Default-loss rate", pct(roi.default_loss_rate), "missed deadlines")}
+            {tile("Awards on time", pct(roi.award_on_time_rate), "payment SLA")}
+          </div>
+        </div>
+      </div>
+      {trend.length > 0 && (
+        <div className="panel">
+          <div className="ph">Dollars defended over time<span className="act"><span className="muted" style={{ fontSize: 11 }}>by month</span></span></div>
+          <div className="pb" style={{ paddingTop: 12 }}>
+            <div style={{ display: "flex", alignItems: "flex-end", gap: 6, height: 90, marginTop: 6 }}>
+              {trend.map((p, i) => (
+                <div key={i} style={{ flex: 1, textAlign: "center", minWidth: 0 }} title={`${p.label}: ${money(p.value)}`}>
+                  <div style={{ height: Math.round((Number(p.value) / mx) * 74) + 2, background: "var(--c-indigo,#3b3550)", borderRadius: "3px 3px 0 0" }} />
+                  <div className="muted" style={{ fontSize: 9, marginTop: 3 }}>{p.label}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ============================================================ Webhooks
 const WH_EVENTS = ["*", "dispute.created", "dispute.resolved", "payment.scheduled", "document.signed", "determination.issued"];
 const WH_TONE = { delivered: "green", failed: "red", retrying: "amber", dispatched: "grey", pending: "grey" };
@@ -679,6 +874,16 @@ function ModelView({ orgId, onErr }) {
     catch (e) { onErr(e.message); }
     setBusy(false);
   }
+  async function refit() {
+    setBusy(true);
+    try {
+      const { data, error } = await supabase.rpc("refit_win_model", { p_org: orgId, p_version: "v1", p_min_n: 8 });
+      if (error) throw error;
+      if (data?.ok && data?.accepted === false && data?.reason) onErr(`Refit: ${data.reason} (n=${data.n})`);
+      await load();
+    } catch (e) { onErr(e.message); }
+    setBusy(false);
+  }
 
   const tile = (label, val, hint) => (
     <div className="kpi-tile"><div className="l">{label}</div><div className="n" style={{ fontFamily: "var(--num,monospace)" }}>{val}</div>{hint && <div className="goal">{hint}</div>}</div>
@@ -691,7 +896,8 @@ function ModelView({ orgId, onErr }) {
         <div className="ph">Win-probability model — accuracy
           <span className="act" style={{ display: "flex", gap: 8, alignItems: "center" }}>
             <span className="muted" style={{ fontSize: 11 }}>{cal?.model_version ? "version " + cal.model_version : ""}</span>
-            <button className="btn btn-s" style={{ padding: "6px 12px" }} disabled={busy || !cal || cal.n === 0} onClick={snapshot}>{busy ? "Recording…" : "Record snapshot"}</button>
+            <button className="btn btn-s" style={{ padding: "6px 12px" }} disabled={busy || !cal || cal.n === 0} onClick={refit}>{busy ? "Working…" : "Refit from outcomes"}</button>
+            <button className="btn btn-s" style={{ padding: "6px 12px" }} disabled={busy || !cal || cal.n === 0} onClick={snapshot}>Record snapshot</button>
           </span>
         </div>
         <div className="pb" style={{ paddingTop: 12 }}>
@@ -706,12 +912,25 @@ function ModelView({ orgId, onErr }) {
             <>
               <div className="cards" style={{ marginBottom: 4 }}>
                 {tile("Scored", cal.n, "resolved cases")}
-                {tile("Brier", cal.brier_score, cal.brier_score < 0.25 ? "beats coin-flip" : "review")}
+                {tile("Brier (raw)", cal.brier_score, cal.brier_score < 0.25 ? "beats coin-flip" : "review")}
+                {tile("Brier (calibrated)", cal.brier_calibrated ?? "—", "after learning")}
                 {tile("Accuracy", pct(cal.accuracy_at_0_5), "at 0.5 threshold")}
                 {tile("Separation", (cal.separation > 0 ? "+" : "") + cal.separation, cal.separation > 0 ? "discriminating" : "weak")}
                 {tile("Base rate", pct(cal.base_rate), "actual win rate")}
-                {tile("Mean pred", pct(cal.mean_predicted), "avg predicted")}
               </div>
+              {cal.recalibration && (
+                <div className="rcard" style={{ padding: "10px 13px", marginTop: 10 }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8 }}>
+                    <span style={{ fontSize: 12.5 }}><b>Recalibration</b> — learned from realized outcomes
+                      {cal.recalibration.accepted
+                        ? <span className="badge b-green" style={{ marginLeft: 8 }}><i className="dot d-green" />active</span>
+                        : <span className="badge b-grey" style={{ marginLeft: 8 }}>{cal.recalibration.note ? "not fit" : "no gain — identity kept"}</span>}
+                    </span>
+                    {cal.recalibration.accepted && <span className="mono muted" style={{ fontSize: 11 }}>logit ×{cal.recalibration.a} {cal.recalibration.b >= 0 ? "+" : ""}{cal.recalibration.b} · log-loss {cal.recalibration.log_loss_raw} → {cal.recalibration.log_loss_calibrated} · n={cal.recalibration.n}</span>}
+                  </div>
+                  <div className="muted" style={{ fontSize: 11, marginTop: 4 }}>Platt scaling on the model&apos;s own scores; accepted only when it lowers log-loss. Re-run &quot;Refit from outcomes&quot; as more cases resolve.</div>
+                </div>
+              )}
               <div className="rlabel" style={{ marginTop: 14 }}>Calibration — predicted vs actual by probability band</div>
               <table>
                 <thead><tr><th>Band</th><th>n</th><th>Avg predicted</th><th>Avg actual</th><th></th></tr></thead>

@@ -16,7 +16,7 @@ import { GettingStarted } from "./GettingStarted";
 import { WorkspaceSwitcher } from "./WorkspaceSwitcher";
 import Claims from "../dispute/[id]/Claims";
 
-const TABS = ["Overview", "Cases", "Intelligence", "Workspace", "Filing", "Admin"];
+const TABS = ["Overview", "Cases", "Workspace", "Intelligence", "Filing", "Admin"];
 const INTEL = [["initiators", "Initiators & IDREs"], ["exposure", "Employer exposure"], ["live", "Live intelligence"]];
 const STAGES = [["all", "All"], ["due", "Due soon"], ["incoming", "Incoming"], ["eligibility", "Eligibility"], ["qpa", "QPA defense"], ["respond", "Respond & pay"]];
 const mkg = { pass: ["pass", "✓"], fail: ["fail", "×"], warn: ["warn", "!"], na: ["na", "–"] };
@@ -104,18 +104,6 @@ export default function Dashboard() {
   const [dispQuery, setDispQuery] = useState("");
   const [briefFilter, setBriefFilter] = useState("all");   // all | draft | in_review | approved | filed | sealed | none
   const [phaseFilter, setPhaseFilter] = useState("all");   // all | open_negotiation | idr
-  const [listOpen, setListOpen] = useState(true);          // left case-list rail collapse
-  const [railOpen, setRailOpen] = useState(true);          // right autopilot panel collapse
-  useEffect(() => {
-    try {
-      const s = JSON.parse(localStorage.getItem("avertyn.panes") || "{}");
-      if (typeof s.list === "boolean") setListOpen(s.list);
-      if (typeof s.rail === "boolean") setRailOpen(s.rail);
-    } catch {}
-  }, []);
-  useEffect(() => {
-    try { localStorage.setItem("avertyn.panes", JSON.stringify({ list: listOpen, rail: railOpen })); } catch {}
-  }, [listOpen, railOpen]);
   const [selected, setSelected] = useState(() => new Set());
   const [busy, setBusy] = useState("");
   const [verify, setVerify] = useState(null);
@@ -135,7 +123,7 @@ export default function Dashboard() {
       setOrgId(me?.org_id || null);
 
       const res = await Promise.all([
-        supabase.from("disputes").select("id, external_ref, cpt_code, demand_amount, qpa_amount, workflow_state, disposition, eligibility_score, respond_by, pay_by, phase, claim_number, idr_registration_number, plans(name), initiators(name)").order("respond_by", { ascending: true, nullsFirst: false }),
+        supabase.from("disputes").select("id, external_ref, cpt_code, demand_amount, qpa_amount, workflow_state, disposition, eligibility_score, respond_by, pay_by, phase, claim_number, idr_registration_number, plans(name), initiators(name), claims(count)").order("respond_by", { ascending: true, nullsFirst: false }),
         supabase.from("org_metrics").select("*").maybeSingle(),
         supabase.from("org_scorecard").select("*").maybeSingle(),
         supabase.from("awards_metrics").select("*").maybeSingle(),
@@ -189,7 +177,7 @@ export default function Dashboard() {
     if (!id) return;
     try {
       const [{ data: d }, { data: find }, { data: q }, { data: docs }, { data: offs }] = await Promise.all([
-        supabase.from("disputes").select("*, plans(name), initiators(name)").eq("id", id).single(),
+        supabase.from("disputes").select("*, plans(name), initiators(name), claims(count)").eq("id", id).single(),
         supabase.from("eligibility_findings").select("result, detail, eligibility_rules(name, severity)").eq("dispute_id", id),
         supabase.from("qpa_records").select("*").eq("dispute_id", id).maybeSingle(),
         supabase.from("documents").select("id, kind, title, status, esign_status, signed_by, signed_at, created_at, content").eq("dispute_id", id).order("created_at", { ascending: false }),
@@ -224,7 +212,7 @@ export default function Dashboard() {
   useEffect(() => {
     if (typeof window === "undefined") return;
     const p = new URLSearchParams(window.location.search);
-    const map = { overview: 0, cases: 1, intelligence: 2, workspace: 3, filing: 4, admin: 5 };
+    const map = { overview: 0, cases: 1, workspace: 2, intelligence: 3, filing: 4, admin: 5 };
     const t = p.get("tab");
     if (t && map[t] != null) setTab(map[t]);
     if (p.get("open") === "import") setImportOpen(true);
@@ -462,7 +450,7 @@ export default function Dashboard() {
             briefCounts={briefCounts} onPickBrief={pickBrief} onExportFiled={exportFiledBriefs} />
           <PredictionsView embedded onErr={setErr} onOpen={(id) => { setSel(id); setTab(1); setStage("all"); }} />
         </div>
-      ) : tab === 2 ? (
+      ) : tab === 3 ? (
         <div style={{ flex: 1, overflow: "auto", padding: "22px 26px" }}>
           <div className="shead">
             <div className="stitle">
@@ -481,7 +469,7 @@ export default function Dashboard() {
             : intel === "live" ? <LiveIntelligenceView orgId={orgId} onErr={setErr} embedded />
             : <InitiatorsView orgId={orgId} onErr={setErr} embedded />}
         </div>
-      ) : tab === 3 ? (
+      ) : tab === 2 ? (
         <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "auto", minHeight: 0 }}>
           <WorkspaceHub email={email} orgId={orgId} userId={userId} onErr={setErr} />
         </div>
@@ -542,12 +530,9 @@ export default function Dashboard() {
               <button className="mini" onClick={() => downloadCSV("avertyn-disputes.csv", displayed, DISPUTE_CSV_COLS)}>Export CSV</button>
             </div>
           </div>
-          <div className={"work" + (listOpen ? "" : " list-collapsed") + (railOpen ? "" : " rail-collapsed")} style={{ flex: 1 }}>
-          <div className={"list" + (listOpen ? "" : " collapsed")}>
-            {listOpen ? (<>
-            <div className="lhdr"><b>{tabHeader}</b><span className="ct">{displayed.length}</span>
-              <button className="pane-toggle" title="Collapse case list" aria-label="Collapse case list" onClick={() => setListOpen(false)}>«</button>
-            </div>
+          <div className="work" style={{ flex: 1 }}>
+          <div className="list">
+            <div className="lhdr"><b>{tabHeader}</b><span className="ct">{displayed.length}</span></div>
             {displayed.length === 0
               ? <p className="muted" style={{ padding: 16 }}>Nothing here right now.</p>
               : displayed.map((r) => {
@@ -570,6 +555,7 @@ export default function Dashboard() {
                             <span className={"badge b-" + (idr ? "green" : "amber")} title={idr ? "Federal IDR" : "Open negotiation"}>
                               <i className={"dot d-" + (idr ? "green" : "amber")} />{idr ? "IDR" : "Open neg."}
                             </span>
+                            {ci.isBatch && <span className="badge b-ink" title={`Batched — ${ci.claimCount} claims under this case${ci.leadClaim ? `; lead ${ci.leadClaim}` : ""}`}>Batch · {ci.claimCount}</span>}
                             {ci.internal && ci.isLegal && <span className="muted" style={{ fontSize: 11 }}>internal #{ci.internal}</span>}
                           </>
                         ); })()}
@@ -591,27 +577,12 @@ export default function Dashboard() {
                     </div>
                   );
                 })}
-            </>) : (
-              <button className="pane-reopen" title="Show case list" aria-label="Show case list" onClick={() => setListOpen(true)}><span className="chev">»</span><span className="vlabel">Cases</span></button>
-            )}
           </div>
           <div className="detail">
-            {detail && (
-              <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 10 }}>
-                <button className="mini" title={(listOpen || railOpen) ? "Collapse both panels for a full-width case" : "Restore both panels"}
-                  onClick={() => { const open = !(listOpen || railOpen); setListOpen(open); setRailOpen(open); }}>
-                  {(listOpen || railOpen) ? "↔ Full case" : "Exit full case"}
-                </button>
-              </div>
-            )}
             {!detail ? <p className="muted">Select a dispute…</p> : <Detail dd={detail} onRun={runEngine} onDoc={genLetter} onOpenNeg={openNeg} onAction={caseAction} onStageMoney={stageMoney} onView={setDocView} onExplain={() => setExplainId(sel)} onChanged={() => { loadDetail(sel); loadShell(); }} busy={busy} />}
           </div>
-          <div className={"rail" + (railOpen ? "" : " collapsed")}>
-            {railOpen ? (<>
-            <div className="rlabel" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
-              <span>Autopilot · governed</span>
-              <button className="pane-toggle" title="Collapse autopilot panel" aria-label="Collapse autopilot panel" onClick={() => setRailOpen(false)}>»</button>
-            </div>
+          <div className="rail">
+            <div className="rlabel">Autopilot · governed</div>
             <div className="rcard">
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
                 <b style={{ fontFamily: "var(--disp)", fontSize: 15 }}>Agent</b>
@@ -657,9 +628,6 @@ export default function Dashboard() {
             <div className="rcard"><div className="feed">
               {feed.map((e, i) => <div key={i}>{e.actor === "agent" ? "✦" : "•"} <b>{e.action_type}</b> · {e.actor}{e.rationale ? " — " + e.rationale.slice(0, 60) : ""}</div>)}
             </div></div>
-            </>) : (
-              <button className="pane-reopen" title="Show autopilot panel" aria-label="Show autopilot panel" onClick={() => setRailOpen(true)}><span className="chev">«</span><span className="vlabel">Autopilot</span></button>
-            )}
           </div>
         </div>
         </div>
@@ -897,11 +865,12 @@ function Detail({ dd, onRun, onDoc, onOpenNeg, onAction, onStageMoney, onView, o
   return (
     <div>
       <div className="dh">{(() => { const ci = caseIdentity(d); return (<>
-        <h1>{ci.label} {ci.number}</h1>
+        <h1>{ci.isBatch ? ci.label : `${ci.label} ${ci.number}`}</h1>
         <span className={"badge b-" + (ci.phaseIdr ? "green" : "amber")} style={{ marginLeft: 10 }} title="Case phase">
           <i className={"dot d-" + (ci.phaseIdr ? "green" : "amber")} />{ci.phaseIdr ? "Federal IDR" : "Open negotiation"}
         </span>
-        {ci.internal && <span className="badge b-grey" style={{ marginLeft: 8 }} title="Operator internal case number">Internal #{ci.internal}</span>}
+        {ci.isBatch && ci.leadClaim && <span className="badge b-ink" style={{ marginLeft: 8 }} title="Lead claim in this batch">Lead {ci.leadClaim}</span>}
+        {ci.internal && <span className="badge b-grey" style={{ marginLeft: 8 }} title="Operator internal case number — the permanent identifier across phases">Internal #{ci.internal}</span>}
       </>); })()}
         <span className="sub">{d.initiators?.name} · CPT {d.cpt_code} · {d.plans?.name} · {d.workflow_state}</span>
         {d.win_prob != null && (() => { const wp = Math.round(Number(d.win_prob) * 100); const tone = wp >= 60 ? "sage" : wp >= 40 ? "amber" : "red"; return <span className={"badge b-" + tone} style={{ marginLeft: 10 }} title="Modeled plan-prevail probability — open Explain for the full driver breakdown"><i className={"dot d-" + tone} />{wp}% win</span>; })()}
@@ -942,12 +911,6 @@ function Detail({ dd, onRun, onDoc, onOpenNeg, onAction, onStageMoney, onView, o
           <Bar l="Plan QPA" v={qpa.plan_qpa} max={d.demand_amount} c="var(--ink)" showref />
           <Bar l="Regional median" v={qpa.benchmark_regional} max={d.demand_amount} c="var(--c-teal)" />
           <Bar l="Defensible ceiling" v={qpa.defensible_ceiling} max={d.demand_amount} c="var(--c-sage)" />
-          {qpa.ceiling_source && (
-            <div className="muted" style={{ fontSize: 11.5, marginTop: 4, display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-              <span>Ceiling basis: {({ manual_override: "Manual override (this case)", plan_policy: "Plan policy", org_default: "Org default", global_default: "Global default" })[qpa.ceiling_source] || qpa.ceiling_source}</span>
-              {qpa.ceiling_above_benchmark && <span className="badge b-amber" title="This ceiling exceeds the regional benchmark median — above the defensible benchmark"><i className="dot d-amber" />Above benchmark</span>}
-            </div>
-          )}
           {qpa.notes && <p className="muted" style={{ fontSize: 12 }}>{qpa.notes}</p>}
         </div></div>
       )}
