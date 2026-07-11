@@ -184,7 +184,7 @@ function Ledger({ rows, briefMap, negMap, stagedSet, busy, onOpen, onRunBulk, on
                     <td className="num mono">{money(r.demand_amount)}</td>
                     <td className="num mono">{money(r.qpa_amount)}</td>
                     <td className="num"><span className={"cs-ratio " + rcls}>{rr ? rr.toFixed(1) + "×" : "—"}</span></td>
-                    <td className="num"><span className="cs-bar"><i style={{ width: elig + "%", background: elig >= 60 ? "var(--sig)" : elig >= 40 ? "var(--warn)" : "var(--faint)" }} /></span><span className="mono" style={{ fontSize: 11 }}>{elig}</span></td>
+                    <td className="num"><span className="cs-elbar"><i style={{ width: elig + "%", background: elig >= 60 ? "var(--sig)" : elig >= 40 ? "var(--warn)" : "var(--faint)" }} /></span><span className="mono" style={{ fontSize: 11 }}>{elig}</span></td>
                     <td className="num">{cd ? <span className={"cs-cd cd-" + cd.tone}>{cd.txt}</span> : <span className="faint">—</span>}</td>
                     <td>{b ? <span className={"badge b-" + (DOC_STATUS_TONE[b.status] || "grey")}>{DOC_STATUS_LABEL[b.status] || "Draft"}</span> : <span className="faint">—</span>}</td>
                     <td className="num">{n ? <span className="mono" style={{ fontSize: 11.5 }}>{n.last_pct != null ? Math.round(n.last_pct) + "%" : money(n.last_amount)}</span> : <span className="faint">—</span>}</td>
