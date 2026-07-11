@@ -451,7 +451,7 @@ export default function Dashboard() {
       </div>
 
       <div className="tabs">
-        {TABS.map((t, i) => <button key={t} className={"tab" + (i === tab ? " on" : "")} onClick={() => setTab(i)}>{t}</button>)}
+        {[0, 1, 6, 3, 2, 4, 5].map((i) => <button key={TABS[i]} className={"tab" + (i === tab ? " on" : "")} onClick={() => setTab(i)}>{TABS[i]}</button>)}
       </div>
 
       {tab === 0 ? (
