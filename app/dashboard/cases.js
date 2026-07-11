@@ -70,9 +70,7 @@ export function CasesSurface(props) {
             : view === "ledger" ? "The whole book — sort, filter, act in bulk, drill in"
             : "Everything that needs a human decision, ranked — you govern the autopilot"}</div>
         </div>
-        {caseOpen ? (
-          <button className="mini" onClick={() => setCaseOpen(false)}>‹ Back to {view === "command" ? "deck" : "Ledger"}</button>
-        ) : (
+        {!caseOpen && (
           <div className="cs-seg">
             {[["ledger", "▦ Ledger"], ["command", "✦ Command deck"]].map(([k, l]) => (
               <button key={k} className={view === k ? "on" : ""} onClick={() => setView(k)}>{l}
@@ -83,7 +81,7 @@ export function CasesSurface(props) {
       </div>
 
       {caseOpen
-        ? <CaseFile detailLoaded={detailLoaded} renderDetail={renderDetail} rows={rows} sel={sel} setSel={setSel} agent={agent} onExplain={onExplain} />
+        ? <CaseFile detailLoaded={detailLoaded} renderDetail={renderDetail} rows={rows} sel={sel} setSel={setSel} agent={agent} onExplain={onExplain} onBack={() => setCaseOpen(false)} backLabel={view === "command" ? "Command deck" : "Cases"} />
         : view === "ledger"
           ? <Ledger rows={rows} briefMap={briefMap} negMap={negMap} stagedSet={stagedSet} busy={busy}
               onOpen={openCase} onRunBulk={onRunBulk} onBatchFile={onBatchFile} onExportCSV={onExportCSV} />
@@ -201,11 +199,17 @@ function Ledger({ rows, briefMap, negMap, stagedSet, busy, onOpen, onRunBulk, on
 }
 
 /* ============================ Case File ============================ */
-function CaseFile({ detailLoaded, renderDetail, rows, sel, setSel, agent, onExplain }) {
+function CaseFile({ detailLoaded, renderDetail, rows, sel, setSel, agent, onExplain, onBack, backLabel }) {
+  const cur = rows.find((r) => r.id === sel);
   return (
     <div className="cs-file">
       <div className="cs-filebar">
-        <select className="dsel" value={sel || ""} onChange={(e) => setSel(e.target.value)} title="Switch case">
+        <button className="cs-back" onClick={onBack} title={"Back to " + (backLabel || "Cases")}>
+          <span className="chev">‹</span> {backLabel || "Cases"}
+        </button>
+        <span className="cs-crumbsep">/</span>
+        <span className="cs-crumbcur">{cur ? caseIdentity(cur).number : "Case"}</span>
+        <select className="dsel" style={{ marginLeft: "auto" }} value={sel || ""} onChange={(e) => setSel(e.target.value)} title="Switch to another case">
           {rows.map((r) => <option key={r.id} value={r.id}>{caseIdentity(r).number} · {r.initiators?.name || "—"}</option>)}
         </select>
       </div>
