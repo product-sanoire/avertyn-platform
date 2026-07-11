@@ -1041,3 +1041,12 @@ input,select,textarea{color:var(--ink);font-family:inherit}
 .ws-fchip:hover,.cs-chip:hover{color:var(--ink);border-color:var(--line-2)}
 .ws-fchip.on,.cs-chip.on{background:var(--sig-soft);color:var(--sig-ink);border-color:var(--sig-line)}
 .tab:focus-visible,.seg button:focus-visible,.ws-seg button:focus-visible,.cs-seg button:focus-visible,.ws-scope button:focus-visible,.ws-fchip:focus-visible,.cs-chip:focus-visible,.btn:focus-visible,.mini:focus-visible{outline:2px solid var(--sig-line);outline-offset:2px}
+
+/* ============================================================
+   Workbench rail accent (2026-07). Additive: the vertical Workbench
+   nav active item carries the --sig accent (left bar + soft tint) so
+   "active = red" holds everywhere. Sidebar pattern otherwise unchanged.
+   ============================================================ */
+.wbxitem{position:relative}
+.wbxitem.on{background:var(--sig-soft);color:var(--sig-ink)}
+.wbxitem.on::before{content:"";position:absolute;left:0;top:6px;bottom:6px;width:3px;border-radius:0 3px 3px 0;background:var(--sig)}
