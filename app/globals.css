@@ -954,6 +954,60 @@ input,select,textarea{color:var(--ink);font-family:inherit}
 @media(max-width:1100px){.cs-filegrid{grid-template-columns:1fr}.cs-deck{grid-template-columns:1fr}.cs-deckcol,.cs-decksurface,.cs-deckrail{max-height:none}}
 
 /* ============================================================
+   Workbench tab + Tools drawer (Register/Templates/Library/Programs
+   moved out of the masthead).
+   ============================================================ */
+/* header Tools button icon */
+.toolsbtn{display:inline-flex;align-items:center;gap:8px}
+.tools-ico{display:grid;grid-template-columns:repeat(2,1fr);gap:2.5px}
+.tools-ico i{width:5px;height:5px;border-radius:1.5px;background:var(--ink-2);display:block}
+/* Workbench tab */
+.wbx{display:grid;grid-template-columns:216px minmax(0,1fr);gap:0;min-height:calc(100vh - 132px)}
+.wbxnav{border-right:1px solid var(--line);padding:16px 12px;position:sticky;top:0;align-self:start}
+.wbxlbl{font-size:9.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--faint);font-weight:700;padding:6px 11px 8px}
+.wbxitem{display:flex;align-items:center;gap:11px;width:100%;text-align:left;padding:10px 11px;border-radius:10px;border:0;background:none;cursor:pointer;transition:background var(--dur);color:var(--ink-2);margin-bottom:2px}
+.wbxitem:hover{background:var(--card-2)}
+.wbxitem.on{background:var(--sunk);color:var(--ink)}
+.wbxitem .ic{width:28px;height:28px;border-radius:8px;flex:none;display:grid;place-items:center;font-size:13px;color:#fff}
+.wbxitem.register .ic{background:linear-gradient(150deg,#33415c,#25304a)}
+.wbxitem.templates .ic{background:linear-gradient(150deg,#7a5230,#5a3c22)}
+.wbxitem.library .ic{background:linear-gradient(150deg,#2e6b4c,#245239)}
+.wbxitem.programs .ic{background:linear-gradient(150deg,#8f2c17,#6f2010)}
+.wbxitem .nm{font-size:13.5px;font-weight:600}
+.wbxhint{font-size:11px;color:var(--faint);line-height:1.5;padding:12px 11px;margin-top:8px;border-top:1px solid var(--hair)}
+.wbxmain{min-width:0;overflow:auto;padding:20px 24px}
+.wbxmain .topbar{display:none}
+/* Tools drawer */
+.tdscrim{position:fixed;inset:0;background:rgba(20,24,32,.22);z-index:70;opacity:0;pointer-events:none;transition:opacity var(--dur)}
+.tdscrim.on{opacity:1;pointer-events:auto}
+.tdrawer{position:fixed;top:0;right:0;bottom:0;width:392px;max-width:92vw;background:var(--card);box-shadow:var(--sh-3);z-index:71;transform:translateX(100%);transition:transform .3s var(--ease);overflow:auto;display:flex;flex-direction:column}
+.tdrawer.on{transform:none}
+.tdhd{display:flex;align-items:center;gap:10px;padding:18px 20px 14px;border-bottom:1px solid var(--hair);font-family:var(--disp);font-size:17px;font-weight:600}
+.tdhd .tdi{font-size:16px}
+.tdhd .tdx{margin-left:auto;background:none;border:0;font-size:20px;color:var(--faint);cursor:pointer;line-height:1}
+.tdsearch{margin:12px 16px 4px;display:flex;align-items:center;gap:9px;background:var(--sunk);border-radius:var(--r-pill);padding:9px 13px;color:var(--faint);font-size:12.5px;box-shadow:inset 0 0 0 1px var(--line)}
+.tdctx{margin:8px 16px 4px;background:var(--sig-soft);border-radius:12px;padding:11px 13px;font-size:11.5px;color:var(--sig-ink);line-height:1.5}
+.tdsec{padding:12px 16px}
+.tdtool{display:flex;align-items:center;gap:12px;width:100%;text-align:left;padding:11px 12px;border-radius:12px;border:0;background:none;cursor:pointer;transition:background var(--dur)}
+.tdtool:hover{background:var(--card-2)}
+.tdtool .ic{width:34px;height:34px;border-radius:9px;flex:none;display:grid;place-items:center;font-size:15px;color:#fff}
+.tdtool.register .ic{background:linear-gradient(150deg,#33415c,#25304a)}
+.tdtool.templates .ic{background:linear-gradient(150deg,#7a5230,#5a3c22)}
+.tdtool.library .ic{background:linear-gradient(150deg,#2e6b4c,#245239)}
+.tdtool.programs .ic{background:linear-gradient(150deg,#8f2c17,#6f2010)}
+.tdtool .bd{display:flex;flex-direction:column;min-width:0}
+.tdtool .nm{font-weight:700;font-size:13.5px}
+.tdtool .ds{font-size:11px;color:var(--mut);margin-top:2px}
+.tdtool .go{margin-left:auto;color:var(--faint);font-size:15px}
+.tdlbl{font-size:9.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--faint);font-weight:700;padding:14px 4px 8px}
+.tdqi{display:flex;align-items:center;gap:10px;padding:9px 10px;border-radius:10px;cursor:pointer;font-size:12.5px;text-decoration:none;color:inherit}
+.tdqi:hover{background:var(--card-2)}
+.tdqi .qi{width:24px;height:24px;border-radius:7px;background:var(--sunk);display:grid;place-items:center;font-size:12px;flex:none}
+.tdqi .qt{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-weight:600}
+.tdqi .qm{font-size:10.5px;color:var(--faint)}
+@media(max-width:900px){.wbx{grid-template-columns:1fr}.wbxnav{border-right:0;border-bottom:1px solid var(--line);position:static}}
+
+/* ============================================================
    Minimal sub-tabs (Finish 2): small-caps, tracked, dot marker.
    Additive override of the .seg segmented control (previously a
    filled pill tray). Re-styles chrome only; markup + behavior

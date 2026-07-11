@@ -26,7 +26,7 @@ const SEV_TONE = { high: "red", medium: "amber", low: "grey", info: "grey" };
 const STATUS_TONE = { compliant: "green", gap: "red", in_progress: "amber", na: "grey" };
 const pct = (n) => (n == null ? "—" : Math.round(Number(n)) + "%");
 
-export default function ProgramsPage() {
+export default function ProgramsPage({ embedded }) {
   const [dash, setDash] = useState(null);
   const [cov, setCov] = useState(null);
   const [tab, setTab] = useState("all");
@@ -72,10 +72,10 @@ export default function ProgramsPage() {
 
   return (
     <div>
-      <div className="topbar"><span className="logo">A</span><b>Avertyn</b>
-        <span style={{ color: "#d3cccd", fontSize: 13 }}>· Programs</span></div>
-      <div className="wrap" style={{ maxWidth: 1120, margin: "18px auto", padding: "0 22px" }}>
-        <Link href="/" className="muted">← Command center</Link>
+      {!embedded && (<div className="topbar"><span className="logo">A</span><b>Avertyn</b>
+        <span style={{ color: "#d3cccd", fontSize: 13 }}>· Programs</span></div>)}
+      <div className="wrap" style={{ maxWidth: 1120, margin: embedded ? "0 auto" : "18px auto", padding: "0 22px" }}>
+        {!embedded && <Link href="/" className="muted">← Command center</Link>}
         <div className="dh" style={{ marginTop: 8 }}>
           <div>
             <h1>Programs</h1>

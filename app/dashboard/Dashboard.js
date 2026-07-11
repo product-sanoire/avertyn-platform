@@ -6,6 +6,7 @@ import { money, untilLabel, caseIdentity } from "../../lib/format";
 import { PredictionsView } from "./ops";
 import { WorkspaceHub } from "./workspace";
 import { CasesSurface } from "./cases";
+import { WorkbenchView, ToolsDrawer } from "./workbench";
 import { InitiatorsView } from "./tiera";
 import { LiveIntelligenceView } from "./intel";
 import { ImportHub } from "./import";
@@ -18,7 +19,7 @@ import { GettingStarted } from "./GettingStarted";
 import { WorkspaceSwitcher } from "./WorkspaceSwitcher";
 import Claims from "../dispute/[id]/Claims";
 
-const TABS = ["Overview", "Cases", "Intelligence", "Workspace", "Filing", "Admin", "Payers"];
+const TABS = ["Overview", "Cases", "Intelligence", "Workspace", "Filing", "Admin", "Payers", "Workbench"];
 const INTEL = [["initiators", "Initiators & IDREs"], ["exposure", "Employer exposure"], ["live", "Live intelligence"]];
 const STAGES = [["all", "All"], ["due", "Due soon"], ["incoming", "Incoming"], ["eligibility", "Eligibility"], ["qpa", "QPA defense"], ["respond", "Respond & pay"]];
 const mkg = { pass: ["pass", "✓"], fail: ["fail", "×"], warn: ["warn", "!"], na: ["na", "–"] };
@@ -94,6 +95,8 @@ export default function Dashboard() {
   const [notifList, setNotifList] = useState([]);
   const [notifOpen, setNotifOpen] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
+  const [drawerOpen, setDrawerOpen] = useState(false);       // Tools slide-over
+  const [workbenchSub, setWorkbenchSub] = useState("templates");
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [explainId, setExplainId] = useState(null);
   const [filingBatch, setFilingBatch] = useState(null);
@@ -226,7 +229,7 @@ export default function Dashboard() {
   useEffect(() => {
     if (typeof window === "undefined") return;
     const p = new URLSearchParams(window.location.search);
-    const map = { overview: 0, cases: 1, intelligence: 2, workspace: 3, filing: 4, admin: 5 };
+    const map = { overview: 0, cases: 1, intelligence: 2, workspace: 3, filing: 4, admin: 5, payers: 6, workbench: 7 };
     const t = p.get("tab");
     if (t && map[t] != null) setTab(map[t]);
     if (p.get("open") === "import") setImportOpen(true);
@@ -459,17 +462,16 @@ export default function Dashboard() {
           <button className={"mchip alert" + (notifs ? " loud" : "")} title="Notifications" onClick={() => setNotifOpen(true)}>
             <i className={"dot " + (notifs ? "d-red" : "d-green")} />{notifs}
           </button>
-          <a className="btn btn-s" style={{ padding: "8px 14px", textDecoration: "none" }} href="/authorities">Register</a>
-          <a className="btn btn-s" style={{ padding: "8px 14px", textDecoration: "none" }} href="/templates">Templates</a>
-          <a className="btn btn-s" style={{ padding: "8px 14px", textDecoration: "none" }} href="/library">Library</a>
-          <a className="btn btn-s" style={{ padding: "8px 14px", textDecoration: "none" }} href="/programs">Programs</a>
+          <button className="btn btn-s toolsbtn" style={{ padding: "8px 14px 8px 12px" }} title="Templates, Register, Library & Programs" onClick={() => setDrawerOpen(true)}>
+            <span className="tools-ico" aria-hidden="true"><i /><i /><i /><i /></span>Tools
+          </button>
           <button className="btn btn-s" style={{ padding: "8px 14px" }} onClick={() => setImportOpen(true)}>+ Import</button>
           <AccountMenu email={email} onSignOut={signOut} onExport={exportData} />
         </div>
       </div>
 
       <div className="tabs">
-        {[0, 1, 6, 3, 2, 4, 5].map((i) => <button key={TABS[i]} className={"tab" + (i === tab ? " on" : "")} onClick={() => setTab(i)}>{TABS[i]}</button>)}
+        {[0, 1, 6, 3, 2, 4, 7, 5].map((i) => <button key={TABS[i]} className={"tab" + (i === tab ? " on" : "")} onClick={() => setTab(i)}>{TABS[i]}</button>)}
       </div>
 
       {tab === 0 ? (
@@ -520,6 +522,10 @@ export default function Dashboard() {
         <div style={{ flex: 1, overflow: "auto", padding: 22 }}>
           <PayersView orgId={orgId} onErr={setErr} onOpenCase={(id) => { setSel(id); setTab(1); setStage("all"); }} />
         </div>
+      ) : tab === 7 ? (
+        <div style={{ flex: 1, overflow: "auto" }}>
+          <WorkbenchView sub={workbenchSub} setSub={setWorkbenchSub} />
+        </div>
       ) : (
         <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}>
           <CasesSurface
@@ -550,6 +556,9 @@ export default function Dashboard() {
       {explainId && <ExplainModal disputeId={explainId} onClose={() => setExplainId(null)} />}
       {docView && <DocModal doc={docView} onClose={() => setDocView(null)} />}
       {moneyRel && <MoneyReleaseModal q={moneyRel} onClose={() => setMoneyRel(null)} onRelease={(amt) => { releaseMoney(moneyRel.id, amt); setMoneyRel(null); }} />}
+      <ToolsDrawer open={drawerOpen} onClose={() => setDrawerOpen(false)}
+        contextLabel={tab === 1 && detail ? caseIdentity(detail.d).number : null}
+        onOpenTool={(s) => { setWorkbenchSub(s); setTab(7); setDrawerOpen(false); }} />
       {err && <div className="toast"><span className="td" />{err}<button onClick={() => { setErr(""); loadShell(); }}>Retry</button><button onClick={() => setErr("")}>Dismiss</button></div>}
     </div>
   );
