@@ -15,10 +15,10 @@ export function CommandPalette({ orgId, rows, tabs, onNavigate, onSelectDispute,
 
   useEffect(() => { inputRef.current?.focus(); }, []);
   useEffect(() => {
-    if (!q.trim() || !orgId) { setResults([]); return; }
+    if (!q.trim()) { setResults([]); return; }
     let live = true;
     const t = setTimeout(async () => {
-      const { data } = await supabase.rpc("global_search", { p_org: orgId, p_q: q.trim() });
+      const { data } = await supabase.rpc("global_search", { p_org: orgId || null, p_q: q.trim() });
       if (live) setResults(Array.isArray(data) ? data : []);
     }, 140);
     return () => { live = false; clearTimeout(t); };

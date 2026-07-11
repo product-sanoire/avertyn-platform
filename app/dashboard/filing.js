@@ -41,7 +41,7 @@ export function FilingView({ orgId, onErr, initialBatch, onConsumeInitial }) {
     } catch (er) { onErr(er.message); }
   }, [onErr]);
   useEffect(() => { load(); }, [load]);
-  useEffect(() => { if (!orgId) return; supabase.rpc("idre_behavior", { p_org: orgId }).then(({ data }) => setBehavior(data || [])); }, [orgId]);
+  useEffect(() => { if (!orgId) return; supabase.rpc("idre_scorecard", { p_org: orgId }).then(({ data }) => setBehavior(data || [])); }, [orgId]);
   useLive("filing", ["batches", "batch_disputes", "idre_selections", "portal_submissions"], load);
   // Preselect a batch handed over from the Cases queue ("Batch & file").
   useEffect(() => { if (initialBatch) { setSel(initialBatch); onConsumeInitial && onConsumeInitial(); } }, [initialBatch]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -95,15 +95,25 @@ export function FilingView({ orgId, onErr, initialBatch, onConsumeInitial }) {
 
       {behavior.length > 0 && (
         <div className="panel" style={{ margin: "16px 0 0" }}>
-          <div className="ph">IDRE selection patterns<span className="act"><span className="muted" style={{ fontSize: 11 }}>how often each certified IDRE is selected · reselected</span></span></div>
-          <div className="pb" style={{ paddingTop: 10 }}>
-            {(() => { const mx = Math.max(1, ...behavior.map((b) => Number(b.selections) || 0)); return behavior.slice().sort((a, b) => (b.selections || 0) - (a.selections || 0)).map((b, i) => (
-              <div key={i} style={{ display: "flex", alignItems: "center", gap: 10, padding: "5px 0" }}>
-                <div style={{ width: 190, fontSize: 12.5, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{b.idre}</div>
-                <div style={{ flex: 1, height: 12, background: "var(--sunk,#eee)", borderRadius: 999, overflow: "hidden" }}><div style={{ height: "100%", width: (Number(b.selections) / mx) * 100 + "%", background: "var(--c-indigo,#3b3550)", borderRadius: 999 }} /></div>
-                <div className="mono" style={{ width: 130, textAlign: "right", fontSize: 12 }}>{b.selections} sel{Number(b.reselections) > 0 ? ` · ${b.reselections} re` : ""}</div>
-              </div>
-            )); })()}
+          <div className="ph">IDRE scorecard<span className="act"><span className="muted" style={{ fontSize: 11 }}>payer-ruling rate from resolved awards — prefer the IDREs that rule for the plan</span></span></div>
+          <div className="pb" style={{ paddingTop: 6 }}>
+            <table>
+              <thead><tr><th>IDRE</th><th>Payer-win rate</th><th>Resolved</th><th>Selections</th></tr></thead>
+              <tbody>
+                {behavior.slice().sort((a, b) => (Number(b.payer_win_rate) || -1) - (Number(a.payer_win_rate) || -1)).map((b, i) => {
+                  const r = b.payer_win_rate == null ? null : Number(b.payer_win_rate);
+                  const tone = r == null ? "grey" : r >= 0.7 ? "green" : r >= 0.5 ? "amber" : "red";
+                  return (
+                    <tr key={i}>
+                      <td><b>{b.idre}</b></td>
+                      <td><span className={"badge b-" + tone}><i className={"dot d-" + tone} />{r == null ? "no data yet" : Math.round(r * 100) + "%"}</span></td>
+                      <td className="mono">{b.resolved || 0}</td>
+                      <td className="mono">{b.selections}{Number(b.reselections) > 0 ? ` · ${b.reselections} re` : ""}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
           </div>
         </div>
       )}

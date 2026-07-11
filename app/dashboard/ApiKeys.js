@@ -60,7 +60,7 @@ export function ApiKeysView({ onErr }) {
   async function addHook() {
     setBusy("hook");
     try {
-      const { error } = await supabase.rpc("webhook_register", { p_url: hook.url, p_events: [...hook.events] });
+      const { error } = await supabase.rpc("webhook_create", { p_url: hook.url, p_events: [...hook.events] });
       if (error) throw error;
       setHook({ url: "", events: new Set(["dispute.state_changed"]) });
       await load();

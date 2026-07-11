@@ -466,7 +466,7 @@ export default function Dashboard() {
           </div>
           {intel === "exposure" ? <ExposureView exposure={exposure} embedded />
             : intel === "live" ? <LiveIntelligenceView orgId={orgId} onErr={setErr} embedded />
-            : <InitiatorsView orgId={orgId} onErr={setErr} embedded />}
+            : <InitiatorsView orgId={orgId} onErr={setErr} embedded onPickInitiator={(name) => { setDispQuery(name); setStage("all"); setTab(1); }} />}
         </div>
       ) : tab === 2 ? (
         <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "auto", minHeight: 0 }}>
