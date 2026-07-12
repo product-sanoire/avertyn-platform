@@ -198,6 +198,11 @@ body{
 .embed .wrap{padding:10px 14px 10px}
 .embed .chaps{margin-top:9px}
 
+/* fullscreen */
+.fsbtn{min-width:41px;padding:0;justify-content:center}
+.player:fullscreen{border-radius:0;border:0;width:100vw;height:100vh}
+.player:-webkit-full-screen{border-radius:0;border:0;width:100vw;height:100vh}
+
 /* Controls */
 .controls{display:flex;align-items:center;gap:11px;padding:13px 18px;background:var(--bg-2);border-top:1px solid var(--hair);position:relative;z-index:3;flex:none}
 .btn{border:1px solid var(--hair-2);background:var(--glass);border-radius:11px;height:41px;min-width:41px;padding:0 15px;font-family:var(--sans);font-size:14px;font-weight:500;color:var(--cream);cursor:pointer;display:inline-flex;align-items:center;gap:8px;transition:.16s}
@@ -250,6 +255,7 @@ body{
       <div class="spacer"></div>
       <label class="toggle" title="Auto-advance to the next chapter"><input type="checkbox" id="autoAdv" checked> Autoplay</label>
       <span class="count" id="count">1 / 12</span>
+      <button class="btn fsbtn" id="fs" title="Full screen (F)" aria-label="Full screen"><span class="gi" id="fsIcon"></span></button>
     </div>
   </div>
 
@@ -291,7 +297,9 @@ body{
     lock:     svg("<rect x='5' y='10.5' width='14' height='9.5' rx='2'/><path d='M8 10.5V8a4 4 0 0 1 8 0v2.5'/>"),
     refund:   svg("<path d='M3.5 8.5h11a6 6 0 0 1 0 12H10'/><path d='M7.5 12.5 3.5 8.5l4-4'/>"),
     calendar: svg("<rect x='4' y='5' width='16' height='15' rx='2'/><path d='M4 10h16M9 3v4M15 3v4'/>"),
-    settle:   svg("<path d='M20 6 9 17l-5-5'/><circle cx='12' cy='12' r='10.5'/>")
+    settle:   svg("<path d='M20 6 9 17l-5-5'/><circle cx='12' cy='12' r='10.5'/>"),
+    expand:   svg("<path d='M4 9V5.2A1.2 1.2 0 0 1 5.2 4H9M20 9V5.2A1.2 1.2 0 0 0 18.8 4H15M4 15v3.8A1.2 1.2 0 0 0 5.2 20H9M20 15v3.8A1.2 1.2 0 0 1 18.8 20H15'/>"),
+    compress: svg("<path d='M9 4v3.8A1.2 1.2 0 0 1 7.8 9H4M15 4v3.8A1.2 1.2 0 0 0 16.2 9H20M9 20v-3.8A1.2 1.2 0 0 0 7.8 15H4M15 20v-3.8A1.2 1.2 0 0 1 16.2 15H20'/>")
   });
   function gi(name){return "<span class='gi'>"+(ICON[name]||"")+"</span>";}
 
@@ -518,6 +526,18 @@ body{
   document.getElementById('iPrev').innerHTML=ICON.chevL;
   document.getElementById('iNext').innerHTML=ICON.chevR;
   playIcon.innerHTML=ICON.play;
+  var fsBtn=document.getElementById('fs'), fsIcon=document.getElementById('fsIcon');
+  fsIcon.innerHTML=ICON.expand;
+  function fsOn(){ return document.fullscreenElement||document.webkitFullscreenElement; }
+  function toggleFs(){
+    var el=document.getElementById('player');
+    if(!fsOn()){ var r=el.requestFullscreen||el.webkitRequestFullscreen; if(r) r.call(el); }
+    else { var x=document.exitFullscreen||document.webkitExitFullscreen; if(x) x.call(document); }
+  }
+  fsBtn.addEventListener('click',toggleFs);
+  function onFsChange(){ var on=!!fsOn(); fsIcon.innerHTML=on?ICON.compress:ICON.expand; fsBtn.title=on?'Exit full screen (F)':'Full screen (F)'; setTimeout(fitScene,60); setTimeout(fitScene,300); }
+  document.addEventListener('fullscreenchange',onFsChange);
+  document.addEventListener('webkitfullscreenchange',onFsChange);
 
   S.forEach(function(s,idx){
     var seg=document.createElement('div'); seg.className='seg'; seg.innerHTML='<span></span>';
@@ -594,6 +614,7 @@ body{
     if(e.key===' '){e.preventDefault();setPlay(!playing)}
     else if(e.key==='ArrowRight')go(i+1);
     else if(e.key==='ArrowLeft')go(i-1);
+    else if(e.key==='f'||e.key==='F')toggleFs();
   });
 
   render();

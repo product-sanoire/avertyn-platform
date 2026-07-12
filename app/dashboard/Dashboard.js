@@ -524,7 +524,7 @@ export default function Dashboard() {
         </div>
       ) : tab === 8 ? (
         <div style={{ flex: 1, overflow: "hidden" }}>
-          <iframe src="/idr-101.html" title="IDR 101 — How No Surprises Act IDR works" style={{ width: "100%", height: "100%", border: 0, display: "block" }} />
+          <iframe src="/idr-101.html" title="IDR 101 — How No Surprises Act IDR works" style={{ width: "100%", height: "100%", border: 0, display: "block" }} allowFullScreen />
         </div>
       ) : tab === 7 ? (
         <div style={{ flex: 1, overflow: "auto" }}>
