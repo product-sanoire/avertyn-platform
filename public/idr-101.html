@@ -1,0 +1,595 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>How No Surprises Act IDR Works — Avertyn</title>
+<meta name="description" content="An animated, dual-perspective walkthrough of the federal No Surprises Act independent dispute resolution (IDR) process — what the plan/TPA does, what the provider does, and how an offer wins.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;0,6..72,600;1,6..72,400;1,6..72,500&family=Inter:wght@400;500;600&family=Space+Grotesk:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  /* light chrome */
+  --paper:#f4f1ea; --paper-2:#ece7dd; --ink:#181b20; --ink-2:#40454d; --muted:#7a7d84;
+  --line:#e0dacf; --line-2:#d0c9bb; --sig:#b23a2a; --gold:#a9832f;
+  /* dark theater (scoped in .player) */
+  --bg:#15171c; --bg-2:#1b1e25; --glass:rgba(255,255,255,.045); --glass-2:rgba(255,255,255,.07);
+  --hair:rgba(238,232,222,.12); --hair-2:rgba(238,232,222,.2);
+  --cream:#efeae0; --cream-2:#c3bfb5; --cream-3:#908c83;
+  --sigL:#d76153; --gold-2:#c8a24e;
+  --plan:#7fb2cc; --plan-bg:rgba(127,178,204,.12);
+  --prov:#d6a866; --prov-bg:rgba(214,168,102,.12);
+  --okL:#71c39b; --ok-bg:rgba(113,195,155,.12);
+  --serif:"Newsreader",Georgia,serif; --sans:"Inter",system-ui,sans-serif; --mono:"Space Grotesk",monospace;
+  --r:16px;
+}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{
+  font-family:var(--sans); color:var(--ink); background:var(--paper);
+  -webkit-font-smoothing:antialiased; line-height:1.5;
+  background-image:radial-gradient(1100px 460px at 82% -12%, #f7ece7 0%, rgba(247,236,231,0) 60%);
+}
+.wrap{max-width:1060px;margin:0 auto;padding:26px 20px 44px}
+
+/* Header */
+.top{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-bottom:16px}
+.brand{display:flex;align-items:center;gap:10px}
+.bmk{width:30px;height:30px;border-radius:8px;display:block}
+.btype{font-family:var(--serif);font-weight:600;font-size:20px;letter-spacing:-.01em}
+.btype i{color:var(--sig);font-style:normal}
+.kicker{font-family:var(--mono);font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:var(--muted)}
+.eyebrow{font-family:var(--mono);font-size:11px;letter-spacing:.2em;text-transform:uppercase;color:var(--sig);margin-bottom:6px}
+h1{font-family:var(--serif);font-weight:500;font-size:clamp(26px,3.7vw,40px);line-height:1.06;letter-spacing:-.018em;margin:0 0 .2em}
+.sub{color:var(--ink-2);max-width:64ch;font-size:15.5px;margin:0}
+.sub b{font-weight:600}
+
+/* ---------- Player (dark theater) ---------- */
+.player{
+  margin-top:24px;border-radius:var(--r);background:var(--bg);color:var(--cream);
+  box-shadow:0 1px 0 rgba(255,255,255,.5) inset,0 30px 60px -28px rgba(24,27,32,.55),0 2px 8px rgba(24,27,32,.14);
+  overflow:hidden;position:relative;border:1px solid #0e0f12;
+}
+.player:before{content:"";position:absolute;left:0;right:0;top:0;height:1px;background:linear-gradient(90deg,transparent,rgba(200,162,78,.55),transparent);z-index:5}
+.stagewrap{position:relative;background:
+  radial-gradient(120% 90% at 50% -10%, #22252d 0%, var(--bg) 55%),
+  var(--bg);
+}
+.stagewrap:after{content:"";position:absolute;inset:0;pointer-events:none;
+  background:radial-gradient(130% 120% at 50% 40%, transparent 55%, rgba(0,0,0,.32) 100%);
+  opacity:.9}
+.grain{position:absolute;inset:0;pointer-events:none;opacity:.05;mix-blend-mode:overlay;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E")}
+
+.rail{display:flex;gap:5px;padding:16px 20px 0;position:relative;z-index:3}
+.seg{flex:1;height:3px;border-radius:99px;background:rgba(238,232,222,.14);overflow:hidden;position:relative;cursor:pointer}
+.seg span{position:absolute;inset:0;width:0;background:linear-gradient(90deg,var(--sig),var(--sigL));border-radius:99px}
+.seg.done span{width:100%}
+.seg.active span{width:var(--p,0%)}
+.chaptag{padding:11px 20px 0;font-family:var(--mono);font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--cream-3);display:flex;justify-content:space-between;position:relative;z-index:3}
+.chaptag .now{color:var(--gold-2)}
+.chaptag b{color:var(--cream);font-weight:600}
+
+.stage{position:relative;z-index:3;min-height:452px;padding:20px 34px 34px}
+@media(max-width:720px){.stage{min-height:560px;padding:16px 18px 26px}}
+
+.scene{opacity:0;transition:opacity .55s ease}
+.scene.show{opacity:1}
+.scene-head{display:flex;align-items:flex-start;justify-content:space-between;gap:18px;flex-wrap:wrap;padding-bottom:14px;border-bottom:1px solid var(--hair)}
+.scene-title{font-family:var(--serif);font-weight:500;font-size:clamp(21px,2.9vw,30px);line-height:1.1;letter-spacing:-.012em;margin:2px 0 0;max-width:20ch;color:var(--cream)}
+.chip{font-family:var(--mono);font-size:10.5px;letter-spacing:.08em;padding:7px 13px;border-radius:99px;border:1px solid var(--hair-2);background:var(--glass);color:var(--cream-2);white-space:nowrap;text-transform:uppercase}
+.chip.time{border-color:rgba(200,162,78,.4);background:rgba(200,162,78,.08);color:var(--gold-2)}
+
+.caption{font-family:var(--serif);font-size:clamp(16px,2.05vw,20.5px);line-height:1.42;color:var(--cream);max-width:68ch;margin:20px 0 2px;font-weight:400}
+.caption b{font-weight:600}
+.caption .hl{color:#fff;background:linear-gradient(transparent 62%,rgba(215,97,83,.32) 62%);padding:0 .08em}
+
+/* dual lanes */
+.lanes{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:22px}
+@media(max-width:640px){.lanes{grid-template-columns:1fr}}
+.lane{border:1px solid var(--hair);border-radius:12px;padding:14px 16px;background:var(--glass);position:relative;overflow:hidden;backdrop-filter:blur(2px)}
+.lane:before{content:"";position:absolute;left:0;top:0;bottom:0;width:3px}
+.lane.plan:before{background:var(--plan)} .lane.prov:before{background:var(--prov)}
+.lane h4{margin:0 0 5px;font-family:var(--mono);font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;display:flex;align-items:center;gap:8px}
+.lane.plan h4{color:var(--plan)} .lane.prov h4{color:var(--prov)}
+.lane h4 .gi{width:15px;height:15px}
+.lane p{margin:0;font-size:14px;color:var(--cream-2);line-height:1.5}
+
+/* icons */
+.gi{display:inline-block;vertical-align:middle}
+.gi svg{display:block;width:100%;height:100%}
+.node .ico .gi{width:26px;height:26px}
+
+/* diagram building blocks */
+.diagram{margin-top:22px;min-height:158px;display:flex;align-items:center;justify-content:center}
+.node{border:1px solid var(--hair-2);background:var(--glass);border-radius:13px;padding:14px 16px;text-align:center;min-width:126px;
+  box-shadow:0 12px 24px -18px rgba(0,0,0,.7);backdrop-filter:blur(3px)}
+.node .ico{color:var(--cream);display:flex;justify-content:center;height:26px}
+.node .lbl{font-family:var(--mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--cream-3);margin-top:9px}
+.node .val{font-family:var(--serif);font-weight:500;font-size:17px;margin-top:3px;color:var(--cream);line-height:1.2}
+.node.plan{border-color:rgba(127,178,204,.38);background:var(--plan-bg)} .node.plan .ico{color:var(--plan)}
+.node.prov{border-color:rgba(214,168,102,.38);background:var(--prov-bg)} .node.prov .ico{color:var(--prov)}
+.node.sig{border-color:rgba(215,97,83,.42);background:rgba(215,97,83,.1)} .node.sig .ico{color:var(--sigL)}
+.node.ok{border-color:rgba(113,195,155,.4);background:var(--ok-bg)} .node.ok .ico{color:var(--okL)}
+.flowrow{display:flex;align-items:center;justify-content:center;gap:12px;flex-wrap:wrap}
+.arrow{color:var(--cream-3)}.arrow .gi{width:22px;height:22px}
+
+/* animation helpers */
+.rise{opacity:0;transform:translateY(16px)}
+.show .rise{animation:rise .7s cubic-bezier(.2,.7,.2,1) forwards}
+.show .d1{animation-delay:.1s}.show .d2{animation-delay:.26s}.show .d3{animation-delay:.44s}
+.show .d4{animation-delay:.64s}.show .d5{animation-delay:.86s}.show .d6{animation-delay:1.08s}
+@keyframes rise{to{opacity:1;transform:none}}
+.pop{opacity:0;transform:scale(.85)}
+.show .pop{animation:pop .55s cubic-bezier(.2,.9,.3,1.35) forwards}
+@keyframes pop{to{opacity:1;transform:none}}
+.strike{position:relative}
+.strike:after{content:"";position:absolute;left:52px;right:14px;top:52%;height:2px;background:var(--sigL);transform:scaleX(0);transform-origin:left;border-radius:2px}
+.show .strike:after{animation:strike .55s ease forwards .55s}
+@keyframes strike{to{transform:scaleX(1)}}
+.pulse{animation:pulse 2s ease-in-out infinite}
+@keyframes pulse{0%,100%{box-shadow:0 0 0 0 rgba(215,97,83,.35)}50%{box-shadow:0 0 0 10px rgba(215,97,83,0)}}
+
+/* timeline */
+.tl{width:100%;max-width:580px}
+.tlbar{height:14px;border-radius:99px;background:rgba(238,232,222,.1);border:1px solid var(--hair-2);position:relative;overflow:hidden}
+.tlfill{position:absolute;inset:0;width:0;background:linear-gradient(90deg,var(--plan),var(--prov));border-radius:99px}
+.show .tlfill{animation:fill 3.6s linear forwards .3s}
+@keyframes fill{to{width:100%}}
+.tlmark{position:absolute;top:-7px;width:2px;height:28px;background:var(--sigL);border-radius:2px}
+.tlnote{display:flex;justify-content:space-between;font-family:var(--mono);font-size:10px;letter-spacing:.08em;color:var(--cream-3);margin-top:10px;text-transform:uppercase}
+
+/* offers */
+.offers{display:flex;gap:20px;justify-content:center;flex-wrap:wrap}
+.offer{width:216px;border-radius:14px;border:1px solid var(--hair-2);background:var(--glass-2);padding:15px 16px 16px;position:relative;
+  box-shadow:0 16px 30px -20px rgba(0,0,0,.8)}
+.offer.plan{border-top:3px solid var(--plan)} .offer.prov{border-top:3px solid var(--prov)}
+.offer .who{font-family:var(--mono);font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--cream-3);padding-right:70px}
+.offer .amt{font-family:var(--serif);font-weight:500;font-size:27px;margin:4px 0 10px;color:var(--cream);letter-spacing:.02em}
+.offer .ev{display:flex;flex-wrap:wrap;gap:5px}
+.ev b{font-family:var(--mono);font-weight:400;font-size:10px;letter-spacing:.03em;background:var(--glass);border:1px solid var(--hair);border-radius:6px;padding:4px 7px;color:var(--cream-2)}
+.stamp{position:absolute;top:12px;right:12px;font-family:var(--mono);font-size:9.5px;letter-spacing:.1em;padding:5px 9px;border-radius:99px;border:1px solid var(--okL);color:var(--okL);text-transform:uppercase;opacity:0;transform:rotate(-7deg) scale(.7);display:flex;align-items:center;gap:5px;background:var(--ok-bg)}
+.stamp .gi{width:12px;height:12px}
+.show .offer.win .stamp{animation:pop .55s cubic-bezier(.2,.9,.3,1.35) forwards 1.15s}
+.show .offer.win{box-shadow:0 0 0 1px var(--okL),0 16px 34px -18px rgba(113,195,155,.4)}
+.show .offer.lose.dim{transition:opacity .6s .95s,filter .6s .95s;opacity:.38;filter:grayscale(.7)}
+
+/* factors */
+.fgrid{display:grid;grid-template-columns:1fr 1fr;gap:9px;max-width:680px;width:100%}
+@media(max-width:560px){.fgrid{grid-template-columns:1fr}}
+.factor{display:flex;gap:11px;align-items:flex-start;background:var(--glass);border:1px solid var(--hair);border-radius:11px;padding:11px 13px}
+.factor .n{font-family:var(--mono);font-size:11px;color:var(--cream);background:rgba(238,232,222,.1);border:1px solid var(--hair-2);min-width:24px;height:24px;border-radius:7px;display:grid;place-items:center;flex:none;margin-top:1px;font-weight:500}
+.factor .n.q{background:rgba(215,97,83,.16);border-color:rgba(215,97,83,.5);color:var(--sigL)}
+.factor .n.x{background:rgba(215,97,83,.1);border-color:rgba(215,97,83,.35);color:var(--sigL)}
+.factor .n .gi{width:13px;height:13px}
+.factor p{margin:0;font-size:12.5px;color:var(--cream-2);line-height:1.4}
+.factor p b{color:var(--cream);font-weight:600}
+.banned{display:flex;flex-direction:column;gap:10px;max-width:540px;width:100%}
+.banned .factor{border-color:rgba(215,97,83,.28);background:rgba(215,97,83,.06)}
+
+/* recap */
+.endgrid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;max-width:740px;width:100%}
+@media(max-width:560px){.endgrid{grid-template-columns:1fr}}
+.recap{background:var(--glass);border:1px solid var(--hair);border-radius:11px;padding:12px 14px}
+.recap .k{font-family:var(--mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--gold-2)}
+.recap .v{font-size:13px;color:var(--cream-2);margin-top:3px;line-height:1.35}
+.recap.hero{background:linear-gradient(135deg,rgba(215,97,83,.16),rgba(200,162,78,.1));border-color:rgba(215,97,83,.4)}
+.recap.hero .k{color:var(--sigL)} .recap.hero .v{color:#fff;font-family:var(--serif);font-size:14.5px}
+
+/* comparison */
+.stackcol{display:flex;flex-direction:column;align-items:center;width:100%}
+.seqnote{display:flex;align-items:center;gap:11px;max-width:760px;width:100%;margin:0 auto 15px;padding:11px 15px;border:1px solid rgba(215,97,83,.35);background:rgba(215,97,83,.08);border-radius:11px;font-size:12.5px;color:var(--cream-2);line-height:1.45}
+.seqnote .gi{width:17px;height:17px;color:var(--sigL);flex:none}
+.seqnote b{color:var(--cream)}
+.cmp2{display:grid;grid-template-columns:1fr 1fr;gap:14px;max-width:760px;width:100%}
+@media(max-width:600px){.cmp2{grid-template-columns:1fr}}
+.cmpcard{border:1px solid var(--hair-2);border-radius:12px;overflow:hidden;background:var(--glass)}
+.cmpcard .ch{padding:11px 14px;font-family:var(--mono);font-size:11px;letter-spacing:.12em;text-transform:uppercase;display:flex;align-items:center;gap:9px;border-bottom:1px solid var(--hair)}
+.cmpcard .ch .gi{width:16px;height:16px}
+.cmpcard.neg .ch{color:var(--plan);background:var(--plan-bg)}
+.cmpcard.idr .ch{color:var(--sigL);background:rgba(215,97,83,.1)}
+.cmpcard .r{display:flex;gap:12px;padding:9px 14px;border-top:1px solid var(--hair)}
+.cmpcard .r .k{color:var(--cream-3);min-width:64px;font-size:10px;font-family:var(--mono);letter-spacing:.05em;text-transform:uppercase;padding-top:2px}
+.cmpcard .r .val{color:var(--cream-2);flex:1;font-size:12.5px;line-height:1.4}
+
+/* Controls */
+.controls{display:flex;align-items:center;gap:11px;padding:14px 18px;background:var(--bg-2);border-top:1px solid var(--hair);position:relative;z-index:3}
+.btn{border:1px solid var(--hair-2);background:var(--glass);border-radius:11px;height:42px;min-width:42px;padding:0 15px;font-family:var(--sans);font-size:14px;font-weight:500;color:var(--cream);cursor:pointer;display:inline-flex;align-items:center;gap:8px;transition:.16s}
+.btn:hover{border-color:var(--cream-3);background:var(--glass-2)}
+.btn .gi{width:16px;height:16px}
+.btn.play{background:var(--cream);color:#15171c;border-color:var(--cream);min-width:120px;justify-content:center;font-weight:600}
+.btn.play:hover{background:#fff}
+.spacer{flex:1}
+.count{font-family:var(--mono);font-size:12px;color:var(--cream-3);letter-spacing:.05em}
+.toggle{display:inline-flex;align-items:center;gap:8px;font-size:12.5px;color:var(--cream-2);cursor:pointer;user-select:none}
+.toggle input{accent-color:var(--sigL);width:15px;height:15px}
+
+/* chapter rail below */
+.chaps{display:flex;flex-wrap:wrap;gap:8px;margin-top:18px}
+.chapbtn{border:1px solid var(--line);background:#fffdfa;border-radius:99px;padding:8px 14px;font-size:12.5px;color:var(--ink-2);cursor:pointer;display:flex;align-items:center;gap:8px;transition:.16s}
+.chapbtn:hover{border-color:var(--ink-2);transform:translateY(-1px)}
+.chapbtn.on{background:var(--ink);color:#fff;border-color:var(--ink)}
+.chapbtn .num{font-family:var(--serif);font-size:13px;font-style:italic;opacity:.85}
+
+.foot{margin-top:22px;font-size:12px;color:var(--muted);line-height:1.65;max-width:82ch}
+.foot a{color:var(--ink-2)}
+@media(prefers-reduced-motion:reduce){
+  .show .rise,.show .pop,.show .tlfill,.pulse,.show .offer.win .stamp{animation:none!important}
+  .rise,.pop{opacity:1;transform:none}.stamp{opacity:1;transform:none}.tlfill{width:100%}
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="top">
+    <div class="brand">
+      <svg class="bmk" viewBox="0 0 512 512" aria-hidden="true"><rect width="512" height="512" rx="112" fill="#181b20"/><g fill="none" stroke="#f4f1ea" stroke-width="44" stroke-linecap="butt" stroke-linejoin="round"><path d="M172 374 L244 196"/><path d="M340 374 L268 196"/></g><circle cx="256" cy="182" r="27" fill="#b23a2a"/></svg>
+      <span class="btype">Avertyn<i>.</i></span>
+    </div>
+    <span class="kicker">Learn · IDR 101</span>
+  </div>
+
+  <div class="eyebrow">The No Surprises Act</div>
+  <h1>How federal IDR works — from both sides of the table</h1>
+  <p class="sub">A guided, chaptered walkthrough of the two-stage process — <b style="color:var(--plan)">open negotiation</b> first, then <b style="color:var(--sig)">IDR arbitration</b>. Each step shows what the plan / TPA does and what the provider does, so every party understands its role and how one offer ends up winning.</p>
+
+  <div class="player" id="player">
+    <div class="stagewrap">
+      <div class="grain"></div>
+      <div class="rail" id="rail" aria-hidden="true"></div>
+      <div class="chaptag"><span class="now" id="chNow">Chapter</span><span>Ch. <b id="chIdx">1</b> / <span id="chTot">12</span></span></div>
+      <div class="stage" id="stage"></div>
+    </div>
+    <div class="controls">
+      <button class="btn" id="prev" title="Previous" aria-label="Previous chapter"><span class="gi" id="iPrev"></span></button>
+      <button class="btn play" id="play"><span class="gi" id="playIcon"></span><span id="playTxt">Play</span></button>
+      <button class="btn" id="next" title="Next" aria-label="Next chapter"><span class="gi" id="iNext"></span></button>
+      <div class="spacer"></div>
+      <label class="toggle" title="Auto-advance to the next chapter"><input type="checkbox" id="autoAdv" checked> Autoplay</label>
+      <span class="count" id="count">1 / 12</span>
+    </div>
+  </div>
+
+  <div class="chaps" id="chaps"></div>
+
+  <p class="foot">
+    Educational overview for platform users; not legal advice. Timelines and fees reflect the June 2026 Federal Independent Dispute Resolution Operations Final Rule as summarized by <a href="https://www.cms.gov/newsroom/fact-sheets/federal-independent-dispute-resolution-operations-final-rule" target="_blank" rel="noopener">CMS</a>; process mechanics and the statutory factors follow the No Surprises Act interim final rules and the <a href="https://www.healthsystemtracker.org/brief/independent-dispute-resolution-explainer/" target="_blank" rel="noopener">Peterson-KFF</a> IDR explainer. Certified IDR entity fee ranges are 2023 figures and are updated periodically; some 2026 rule provisions phase in on staggered effective dates.
+  </p>
+</div>
+
+<script>
+(function(){
+  "use strict";
+
+  // ---------- Line-icon set (24x24, 1.6 stroke) ----------
+  function svg(p,extra){return "<svg viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'>"+(extra||"")+p+"</svg>";}
+  var ICON = {
+    provider: svg("<path d='M4 21V8l8-4 8 4v13'/><path d='M4 21h16'/><path d='M9 21v-5h6v5'/><path d='M12 7.5v3M10.5 9h3'/>"),
+    plan:     svg("<path d='M3 21h18'/><path d='M5 21V10m14 11V10M9.5 21V10m5 11V10'/><path d='M12 3 4.5 7.5h15z'/>"),
+    patient:  svg("<path d='M12 3l7 2.7v4.6c0 4.3-2.9 7.2-7 8.7-4.1-1.5-7-4.4-7-8.7V5.7z'/><path d='M9 11.5l2 2 4-4'/>"),
+    send:     svg("<path d='M21.5 3 11 13.5M21.5 3l-6.7 18.5-3.8-8.3-8.3-3.8z'/>"),
+    qpa:      svg("<circle cx='12' cy='12' r='8.2'/><circle cx='12' cy='12' r='3.2'/><path d='M12 1.5v2.3M12 20.2v2.3M1.5 12h2.3M20.2 12h2.3'/>"),
+    review:   svg("<circle cx='11' cy='11' r='7'/><path d='M20.5 20.5 16 16'/>"),
+    talk:     svg("<path d='M21 14.5a2 2 0 0 1-2 2H8l-4 3.2V6a2 2 0 0 1 2-2h13a2 2 0 0 1 2 2z'/><path d='M8.5 9.5h7M8.5 12.5h4'/>"),
+    escalate: svg("<path d='M12 20V5'/><path d='M6 11l6-6 6 6'/>"),
+    scale:    svg("<path d='M12 3v18M7.5 21h9'/><path d='M12 5.5 5 7.5l2.4 5.2a3 3 0 0 0 4.6-.1zM12 5.5 19 7.5l-2.4 5.2a3 3 0 0 1-4.6-.1z'/>"),
+    doc:      svg("<path d='M6.5 2.5h8l4.5 4.5V21.5h-12.5z' /><path d='M14.5 2.5V7h4.5'/><path d='M9.5 13h5M9.5 16.5h5'/>"),
+    ban:      svg("<circle cx='12' cy='12' r='8.4'/><path d='M6.4 6.4l11.2 11.2'/>"),
+    coin:     svg("<circle cx='12' cy='12' r='8.4'/><path d='M12 7.2v9.6'/><path d='M14.4 9.2c0-1-.9-1.7-2.4-1.7s-2.5.7-2.5 1.7.9 1.5 2.5 1.5 2.5.6 2.5 1.7-1 1.8-2.6 1.8-2.5-.7-2.5-1.7'/>"),
+    batch:    svg("<path d='M12 3 21 8l-9 5-9-5z'/><path d='M3 12l9 5 9-5'/><path d='M3 16l9 5 9-5'/>"),
+    check:    svg("<path d='M20 6 9 17l-5-5'/>"),
+    chevL:    svg("<path d='M15 5l-7 7 7 7'/>"),
+    chevR:    svg("<path d='M9 5l7 7-7 7'/>"),
+    play:     svg("<path d='M7 4.5v15l12-7.5z' fill='currentColor' stroke='none'/>"),
+    pause:    svg("<rect x='6' y='5' width='4' height='14' rx='1' fill='currentColor' stroke='none'/><rect x='14' y='5' width='4' height='14' rx='1' fill='currentColor' stroke='none'/>")
+  };
+  Object.assign(ICON,{
+    notice:   svg("<path d='M18 8.5a6 6 0 1 0-12 0c0 6.4-2.7 8.5-2.7 8.5h17.4s-2.7-2.1-2.7-8.5'/><path d='M10 21a2 2 0 0 0 4 0'/>"),
+    portal:   svg("<rect x='3' y='4.5' width='18' height='12.5' rx='2'/><path d='M8 20.5h8M12 17v3.5'/><path d='M8.5 10.5l2.2 2.2 4.3-4.3'/>"),
+    lock:     svg("<rect x='5' y='10.5' width='14' height='9.5' rx='2'/><path d='M8 10.5V8a4 4 0 0 1 8 0v2.5'/>"),
+    refund:   svg("<path d='M3.5 8.5h11a6 6 0 0 1 0 12H10'/><path d='M7.5 12.5 3.5 8.5l4-4'/>"),
+    calendar: svg("<rect x='4' y='5' width='16' height='15' rx='2'/><path d='M4 10h16M9 3v4M15 3v4'/>"),
+    settle:   svg("<path d='M20 6 9 17l-5-5'/><circle cx='12' cy='12' r='10.5'/>")
+  });
+  function gi(name){return "<span class='gi'>"+(ICON[name]||"")+"</span>";}
+
+  // ---------- Scene content ----------
+  var S = [
+    { key:"Start", title:"A bill the patient never sees", time:"Setup",
+      caption:"When a patient receives <span class='hl'>out-of-network</span> emergency or ancillary care, the No Surprises Act takes them out of the middle. The <b>plan / TPA</b> and the <b>provider</b> are left to settle the real payment between themselves.",
+      diagram:
+        "<div class='flowrow'>"+
+          "<div class='node prov rise d1'><div class='ico'>[[provider]]</div><div class='lbl'>Provider</div><div class='val'>Out-of-network</div></div>"+
+          "<div class='node sig pop d3' style='min-width:104px'><div class='ico'>[[patient]]</div><div class='lbl'>Patient</div><div class='val' style='font-size:14px'>Protected</div></div>"+
+          "<div class='node plan rise d2'><div class='ico'>[[plan]]</div><div class='lbl'>Plan / TPA</div><div class='val'>Owes the rest</div></div>"+
+        "</div>",
+      plan:"You cover the claim at an out-of-network amount and owe the balance the patient can't be billed for.",
+      prov:"You rendered care out-of-network and want a fair rate for it — but can't balance-bill the patient." },
+
+    { key:"Paths", title:"Two stages, not one", time:"The big picture", dur:15000,
+      caption:"Resolving the bill has <span class='hl'>two distinct stages</span>. First comes <b>open negotiation</b> — the parties try to agree privately. Only if that fails does it go to <b>IDR</b>: binding arbitration by a neutral third party. Settling in stage one is almost always the better outcome.",
+      diagram:
+        "<div class='flowrow'>"+
+          "<div class='node plan rise d1'><div class='ico'>[[talk]]</div><div class='lbl'>Stage 1</div><div class='val'>Open<br>negotiation</div></div>"+
+          "<div class='arrow rise d2'>"+gi('chevR')+"</div>"+
+          "<div style='display:flex;flex-direction:column;gap:12px'>"+
+            "<div class='node ok rise d3'><div class='ico'>[[settle]]</div><div class='lbl'>If you agree</div><div class='val' style='font-size:15px'>Settled — done</div></div>"+
+            "<div class='node sig rise d4'><div class='ico'>[[scale]]</div><div class='lbl'>If you don't</div><div class='val' style='font-size:15px'>Stage 2 · IDR</div></div>"+
+          "</div>"+
+        "</div>",
+      plan:"You'd rather settle in negotiation — it's faster, free, and you keep control of the number.",
+      prov:"You escalate to IDR only when the evidence genuinely supports a higher rate." },
+
+    { key:"QPA", title:"Initial payment + the QPA", time:"Within ~30 days of the claim",
+      caption:"After a clean claim, the plan has about <b>30 days</b> to send an <b>initial payment or a denial</b> — and must disclose the <span class='hl'>Qualifying Payment Amount (QPA)</span>: its median in-network contracted rate for that service, in that market.",
+      diagram:
+        "<div class='flowrow'>"+
+          "<div class='node plan rise d1'><div class='ico'>[[send]]</div><div class='lbl'>Plan / TPA sends</div><div class='val'>Payment<br>or denial</div></div>"+
+          "<div class='arrow rise d2'>"+gi('chevR')+"</div>"+
+          "<div class='node sig rise d3'><div class='ico'>[[qpa]]</div><div class='lbl'>Discloses</div><div class='val'>QPA</div></div>"+
+          "<div class='arrow rise d4'>"+gi('chevR')+"</div>"+
+          "<div class='node prov rise d5'><div class='ico'>[[review]]</div><div class='lbl'>Provider reviews</div><div class='val'>Enough?</div></div>"+
+        "</div>",
+      plan:"You set the QPA from your median contracted rates and disclose it — it anchors everything that follows.",
+      prov:"You compare the payment and QPA to your expected rate, and decide whether to push back." },
+
+    { key:"Notice", title:"Opening negotiation: the notice", time:"Starts the clock",
+      caption:"Either party opens stage one by filing an <span class='hl'>open negotiation notice</span> through the federal IDR portal — to the other party <b>and the Departments</b>. Filing it is what starts the 30-business-day clock.",
+      diagram:
+        "<div class='flowrow'>"+
+          "<div class='node rise d1'><div class='ico'>[[notice]]</div><div class='lbl'>Open negotiation</div><div class='val'>Notice filed</div></div>"+
+          "<div class='arrow rise d2'>"+gi('chevR')+"</div>"+
+          "<div class='node sig rise d3'><div class='ico'>[[portal]]</div><div class='lbl'>Through the</div><div class='val'>Federal IDR portal</div></div>"+
+          "<div class='arrow rise d4'>"+gi('chevR')+"</div>"+
+          "<div class='node rise d5'><div class='ico'>[[calendar]]</div><div class='lbl'>Clock starts</div><div class='val'>30 biz days</div></div>"+
+        "</div>",
+      plan:"You (or the provider) file the notice; the 2026 rule adds disclosure fields like legal name and registration IDs.",
+      prov:"Either side can file it — it formally opens the window and puts both parties on the clock." },
+
+    { key:"Negotiate", title:"30 business days to agree", time:"~42 calendar days", dur:15000,
+      caption:"During the <span class='hl'>30-business-day</span> window the parties talk <b>directly</b> — trading counteroffers, no arbitrator involved. The party who received the notice must send a <b>response by business day 15</b>. Nothing is binding until both sides agree.",
+      diagram:
+        "<div class='tl rise d1'>"+
+          "<div class='tlbar'><div class='tlfill'></div><div class='tlmark' style='left:50%'></div></div>"+
+          "<div class='tlnote'><span>Day 0 · notice filed</span><span>Day 15 · response due</span><span>Day 30 · window ends</span></div>"+
+        "</div>",
+      plan:"Settle here whenever the number is fair — it avoids fees, delay, and the all-or-nothing risk of arbitration.",
+      prov:"You must respond by day 15. A quick, reasonable settlement avoids arbitration fees for everyone." },
+
+    { key:"Compare", title:"Open negotiation vs. IDR", time:"Know the difference", dur:19000,
+      caption:"These are two different things. Open negotiation is a <span class='hl'>private conversation</span>; IDR is <span class='hl'>binding arbitration</span> by a neutral entity — and negotiation must come first.",
+      diagram:
+        "<div class='stackcol'>"+
+          "<div class='seqnote rise d1'>"+gi('lock')+"<span><b>Sequencing:</b> open negotiation is mandatory — IDR cannot begin until the 30-business-day negotiation has ended without a deal.</span></div>"+
+          "<div class='cmp2'>"+
+            "<div class='cmpcard neg rise d2'>"+
+              "<div class='ch'>"+gi('talk')+"Open negotiation</div>"+
+              "<div class='r'><span class='k'>Who</span><span class='val'>The two parties themselves</span></div>"+
+              "<div class='r'><span class='k'>Style</span><span class='val'>Informal &amp; private</span></div>"+
+              "<div class='r'><span class='k'>Outcome</span><span class='val'>Any amount you both agree to</span></div>"+
+              "<div class='r'><span class='k'>Cost</span><span class='val'>No fees</span></div>"+
+              "<div class='r'><span class='k'>Binding</span><span class='val'>Only if you both sign off</span></div>"+
+              "<div class='r'><span class='k'>Clock</span><span class='val'>30 business days</span></div>"+
+            "</div>"+
+            "<div class='cmpcard idr rise d3'>"+
+              "<div class='ch'>"+gi('scale')+"IDR arbitration</div>"+
+              "<div class='r'><span class='k'>Who</span><span class='val'>A neutral certified IDR entity</span></div>"+
+              "<div class='r'><span class='k'>Style</span><span class='val'>Formal &amp; regulated</span></div>"+
+              "<div class='r'><span class='k'>Outcome</span><span class='val'>One of the two final offers</span></div>"+
+              "<div class='r'><span class='k'>Cost</span><span class='val'>$15 admin + entity fee (loser pays)</span></div>"+
+              "<div class='r'><span class='k'>Binding</span><span class='val'>Yes — only narrow appeal</span></div>"+
+              "<div class='r'><span class='k'>Clock</span><span class='val'>~30 business days to a ruling</span></div>"+
+            "</div>"+
+          "</div>"+
+        "</div>",
+      plan:"Settle in negotiation whenever the number is fair — it's faster, free, and certain.",
+      prov:"Take it to IDR only when the extra factors justify a materially higher rate." },
+
+    { key:"Initiate", title:"No deal? Initiate IDR", time:"Within 4 business days",
+      caption:"If the 30 days end without agreement, either party files an <span class='hl'>IDR initiation notice</span> through the portal within about <b>4 business days</b> — this is the point of no return into arbitration.",
+      diagram:
+        "<div class='flowrow'>"+
+          "<div class='node rise d1'><div class='ico'>[[talk]]</div><div class='lbl'>Negotiation ends</div><div class='val' style='color:var(--sigL)'>No agreement</div></div>"+
+          "<div class='arrow rise d2'>"+gi('chevR')+"</div>"+
+          "<div class='node sig rise d3 pulse'><div class='ico'>[[escalate]]</div><div class='lbl'>File the</div><div class='val'>IDR initiation</div></div>"+
+        "</div>",
+      plan:"You can initiate — or respond to the provider's initiation — and prepare to defend a QPA-anchored number.",
+      prov:"You escalate to a neutral arbitrator if you believe a higher rate is justified by the evidence." },
+
+    { key:"Arbiter", title:"Choose a neutral arbitrator", time:"Eligibility ≤ 5 business days",
+      caption:"The parties <b>jointly select</b> a <span class='hl'>Certified IDR Entity</span> — the neutral arbitrator. If they can't agree, the Departments assign one. It then confirms the dispute is eligible within <b>5 business days</b>.",
+      diagram:
+        "<div class='flowrow'>"+
+          "<div class='node plan rise d1'><div class='ico'>[[plan]]</div><div class='lbl'>Plan / TPA</div></div>"+
+          "<div class='arrow rise d2'>"+gi('chevR')+"</div>"+
+          "<div class='node ok rise d3'><div class='ico'>[[scale]]</div><div class='lbl'>Certified IDR Entity</div><div class='val' style='font-size:15px'>Neutral arbitrator</div></div>"+
+          "<div class='arrow rise d4'>"+gi('chevL')+"</div>"+
+          "<div class='node prov rise d5'><div class='ico'>[[provider]]</div><div class='lbl'>Provider</div></div>"+
+        "</div>",
+      plan:"You agree on (or get assigned) the arbitrator and verify the dispute and its batching are eligible.",
+      prov:"You do the same — a mis-batched or ineligible dispute gets kicked, so accuracy matters." },
+
+    { key:"Offers", title:"Baseball-style: one number each", time:"~10 business days",
+      caption:"Each side submits <b>one final offer</b> plus supporting evidence. The <b>$15 admin fee</b> is due by the offer deadline — miss it and your offer isn't even considered. The arbitrator must pick <span class='hl'>one of the two</span>; there's no splitting the difference.",
+      diagram:
+        "<div class='offers'>"+
+          "<div class='offer plan rise d1'><div class='who'>Plan / TPA offer</div><div class='amt'>$ &mdash;&mdash;&mdash;</div><div class='ev'><b>QPA</b><b>market data</b><b>fee schedule</b></div></div>"+
+          "<div class='offer prov rise d3'><div class='who'>Provider offer</div><div class='amt'>$ &mdash;&mdash;&mdash;</div><div class='ev'><b>complexity</b><b>quality</b><b>experience</b></div></div>"+
+        "</div>",
+      plan:"You submit one number anchored to the QPA, with credible data. Overreaching either way weakens you.",
+      prov:"You submit one number too, backed by evidence that a higher rate is warranted for this care." },
+
+    { key:"Factors", title:"What the arbitrator weighs", time:"The credible factors", dur:16000,
+      caption:"The arbitrator starts from the <span class='hl'>QPA</span>, then weighs <b>credible additional information</b> either side submits. No single factor automatically wins — which is why a precise, well-evidenced brief matters.",
+      diagram:
+        "<div class='fgrid'>"+
+          "<div class='factor rise d1'><span class='n q'>Q</span><p><b>QPA</b> — the median in-network rate (the anchor)</p></div>"+
+          "<div class='factor rise d2'><span class='n'>1</span><p><b>Training, experience &amp; quality</b> of the provider or facility</p></div>"+
+          "<div class='factor rise d3'><span class='n'>2</span><p><b>Market share</b> of the provider and the plan in that area</p></div>"+
+          "<div class='factor rise d4'><span class='n'>3</span><p><b>Patient acuity</b> &amp; complexity of the service furnished</p></div>"+
+          "<div class='factor rise d5'><span class='n'>4</span><p><b>Teaching status, case mix &amp; scope</b> of the facility</p></div>"+
+          "<div class='factor rise d6'><span class='n'>5</span><p><b>Good-faith efforts</b> to contract &amp; prior contracted rates (past 4 years)</p></div>"+
+        "</div>",
+      plan:"You show the QPA is a fair market rate and that the extra factors don't justify paying more here.",
+      prov:"You use these factors to argue this specific case deserves more than the median rate." },
+
+    { key:"Prohibited", title:"What the arbitrator can't consider", time:"Off-limits",
+      caption:"Some numbers are <span class='hl'>off the table entirely</span>. Building an offer or brief on any of these only weakens it.",
+      diagram:
+        "<div class='banned'>"+
+          "<div class='factor strike rise d1'><span class='n x'>"+gi('ban')+"</span><p><b>Billed charges</b> and usual &amp; customary charges</p></div>"+
+          "<div class='factor strike rise d2'><span class='n x'>"+gi('ban')+"</span><p><b>The amount that would have been billed</b> if the No Surprises Act didn't apply</p></div>"+
+          "<div class='factor strike rise d3'><span class='n x'>"+gi('ban')+"</span><p><b>Public-payer rates</b> — Medicare, Medicaid, CHIP, TRICARE</p></div>"+
+        "</div>",
+      plan:"You keep your case to permitted, market-based evidence — and flag when the other side strays.",
+      prov:"You can't lean on sticker-price charges; your argument must rest on the allowed factors." },
+
+    { key:"Decision", title:"One offer wins — binding", time:"Ruling ≤ 30 business days",
+      caption:"Within <b>30 business days</b> of the offers, the arbitrator selects the <span class='hl'>single offer closest to a reasonable rate</span> on the evidence. The decision is <b>binding</b>, with only narrow grounds to challenge it.",
+      diagram:
+        "<div class='offers'>"+
+          "<div class='offer plan win rise d1'><span class='stamp'>"+gi('check')+"Selected</span><div class='who'>Plan / TPA offer</div><div class='amt'>$ &mdash;&mdash;&mdash;</div><div class='ev'><b>QPA-anchored</b><b>well-evidenced</b></div></div>"+
+          "<div class='offer prov lose dim rise d3'><div class='who'>Provider offer</div><div class='amt'>$ &mdash;&mdash;&mdash;</div><div class='ev'><b>not selected</b></div></div>"+
+        "</div>",
+      plan:"Win, and the QPA-anchored number stands. It's winner-take-all — the better-built offer prevails.",
+      prov:"Win, and your higher number is paid in full. Lose, and you're bound by the plan's number — so calibrate." },
+
+    { key:"Fees", title:"Who pays — and when", time:"After the ruling",
+      caption:"The <span class='hl'>losing party bears the entity's fee</span> — both sides pay it up front and the winner's share is refunded. The plan then pays any additional amount owed within about <b>30 days</b>.",
+      diagram:
+        "<div class='flowrow'>"+
+          "<div class='node rise d1'><div class='ico'>[[coin]]</div><div class='lbl'>Admin fee</div><div class='val'>$15</div><div class='lbl' style='text-transform:none;letter-spacing:0'>per party, non-refundable</div></div>"+
+          "<div class='node sig rise d2'><div class='ico'>[[refund]]</div><div class='lbl'>Entity fee ~$350–938</div><div class='val'>Loser pays</div><div class='lbl' style='text-transform:none;letter-spacing:0'>winner refunded</div></div>"+
+          "<div class='node ok rise d3'><div class='ico'>[[send]]</div><div class='lbl'>Balance paid</div><div class='val'>~30 days</div></div>"+
+        "</div>",
+      plan:"Win and the provider covers the entity fee; lose and you pay it plus the higher rate — the offer decides both.",
+      prov:"Win and the plan covers the fee and pays your number; lose and you eat the fee. High stakes, so prepare." },
+
+    { key:"After", title:"After the decision", time:"90-day cooling-off",
+      caption:"For <span class='hl'>90 days</span> after a ruling, the same parties can't re-file IDR for the <b>same item or service</b>. Those later claims are held — and can be <b>batched</b> together afterward (up to 50 line items per dispute).",
+      diagram:
+        "<div class='flowrow'>"+
+          "<div class='node rise d1'><div class='ico'>[[calendar]]</div><div class='lbl'>Cooling-off</div><div class='val'>90 days</div><div class='lbl' style='text-transform:none;letter-spacing:0'>same item, same parties</div></div>"+
+          "<div class='arrow rise d2'>"+gi('chevR')+"</div>"+
+          "<div class='node sig rise d3'><div class='ico'>[[batch]]</div><div class='lbl'>Then batch</div><div class='val'>≤ 50</div><div class='lbl' style='text-transform:none;letter-spacing:0'>line items / dispute</div></div>"+
+        "</div>",
+      plan:"You hold and bundle repeat disputes with the same provider, making volume defense efficient.",
+      prov:"You group similar held claims to make a later dispute worthwhile, within the 50-line-item cap." },
+
+    { key:"Win", title:"The two ways to win", time:"The takeaway", dur:16000,
+      caption:"The best outcome is to <span class='hl'>never reach IDR</span> — a fair settlement in negotiation is faster, free, and certain. But if you must arbitrate, the <span class='hl'>accuracy of your offer and brief</span> is what wins.",
+      diagram:
+        "<div class='endgrid' style='max-width:720px'>"+
+          "<div class='recap rise d1'><div class='k' style='color:var(--okL)'>Best case &middot; avoid IDR</div><div class='v'>Settle in open negotiation when the number is fair. No fees, no arbitrator risk, immediate certainty — and you keep control of the outcome.</div></div>"+
+          "<div class='recap rise d2'><div class='k'>If you must arbitrate</div><div class='v'>A precise, QPA-anchored offer with clean, permitted evidence beats a weak or overreaching one. In winner-take-all, the brief decides it.</div></div>"+
+        "</div>",
+      plan:"Avertyn helps the plan side do both — flag fair settlements early, and build the winning brief when IDR is unavoidable.",
+      prov:"The same discipline applies on the provider side: the better-built, better-evidenced case is the one that wins." },
+
+    { key:"Recap", title:"The whole process, at a glance", time:"Recap", dur:16000,
+      caption:"Two stages, nine steps, one winning offer — settle first if you can.",
+      diagram:
+        "<div class='endgrid'>"+
+          "<div class='recap rise d1'><div class='k'>1 &middot; Trigger</div><div class='v'>Out-of-network claim; patient protected</div></div>"+
+          "<div class='recap rise d1'><div class='k'>2 &middot; QPA</div><div class='v'>Pay or deny in ~30 days; QPA disclosed</div></div>"+
+          "<div class='recap rise d2'><div class='k'>3 &middot; Negotiate</div><div class='v'>File notice; 30 business days; respond by 15</div></div>"+
+          "<div class='recap rise d2'><div class='k'>4 &middot; Escalate</div><div class='v'>No deal &rarr; IDR within ~4 business days</div></div>"+
+          "<div class='recap rise d3'><div class='k'>5 &middot; Arbitrator</div><div class='v'>Certified IDR entity; eligible ≤ 5 days</div></div>"+
+          "<div class='recap rise d3'><div class='k'>6 &middot; Offers</div><div class='v'>One number each + $15 fee + evidence</div></div>"+
+          "<div class='recap rise d4'><div class='k'>7 &middot; Weigh</div><div class='v'>QPA + 5 factors; some off-limits</div></div>"+
+          "<div class='recap rise d4'><div class='k'>8 &middot; Decide</div><div class='v'>One offer wins within 30 business days</div></div>"+
+          "<div class='recap rise d5'><div class='k'>9 &middot; Pay &amp; pause</div><div class='v'>Balance in ~30 days; 90-day cooling-off</div></div>"+
+          "<div class='recap hero rise d5'><div class='k'>The lever</div><div class='v'>Settle first; if not, the best-built offer wins</div></div>"+
+        "</div>",
+      plan:"Know every step and you defend with confidence — and settle when settling is smart.",
+      prov:"Know every step and you dispute only what's genuinely worth disputing." }
+  ];
+
+  // ---------- Engine ----------
+  var stage=document.getElementById('stage'), rail=document.getElementById('rail'),
+      chaps=document.getElementById('chaps'), count=document.getElementById('count'),
+      chNow=document.getElementById('chNow'), chIdx=document.getElementById('chIdx'), chTot=document.getElementById('chTot'),
+      playBtn=document.getElementById('play'), playTxt=document.getElementById('playTxt'), playIcon=document.getElementById('playIcon'),
+      autoAdv=document.getElementById('autoAdv');
+  var i=0, playing=false, timer=null, progT=null, DUR=13500;
+  chTot.textContent=S.length;
+  document.getElementById('iPrev').innerHTML=ICON.chevL;
+  document.getElementById('iNext').innerHTML=ICON.chevR;
+  playIcon.innerHTML=ICON.play;
+
+  S.forEach(function(s,idx){
+    var seg=document.createElement('div'); seg.className='seg'; seg.innerHTML='<span></span>';
+    seg.addEventListener('click',function(){go(idx)}); rail.appendChild(seg);
+    var b=document.createElement('button'); b.className='chapbtn';
+    b.innerHTML="<span class='num'>"+(idx+1)+"</span>"+s.key;
+    b.addEventListener('click',function(){go(idx)}); chaps.appendChild(b);
+  });
+  var segs=rail.children, cbtns=chaps.children;
+
+  function icons(html){ return html.replace(/\[\[(\w+)\]\]/g,function(m,k){return ICON[k]||"";}); }
+
+  function render(){
+    var s=S[i];
+    stage.innerHTML=
+      "<div class='scene' id='sc'>"+
+        "<div class='scene-head'>"+
+          "<h2 class='scene-title'>"+s.title+"</h2>"+
+          "<span class='chip time'>"+s.time+"</span>"+
+        "</div>"+
+        "<div class='diagram'>"+icons(s.diagram)+"</div>"+
+        "<p class='caption'>"+s.caption+"</p>"+
+        "<div class='lanes'>"+
+          "<div class='lane plan'><h4><span class='gi'>"+ICON.plan+"</span>Plan / TPA</h4><p>"+s.plan+"</p></div>"+
+          "<div class='lane prov'><h4><span class='gi'>"+ICON.provider+"</span>Provider</h4><p>"+s.prov+"</p></div>"+
+        "</div>"+
+      "</div>";
+    var sc=document.getElementById('sc'); void sc.offsetWidth; sc.classList.add('show');
+    chNow.textContent="Ch. "+(i+1)+" — "+s.key; chIdx.textContent=i+1; count.textContent=(i+1)+" / "+S.length;
+    for(var k=0;k<segs.length;k++){
+      segs[k].classList.remove('done','active'); segs[k].firstChild.style.width='';
+      if(k<i) segs[k].classList.add('done');
+      cbtns[k].classList.toggle('on',k===i);
+    }
+    segs[i].classList.add('active');
+  }
+
+  function tickProgress(){
+    var el=segs[i].firstChild, t0=Date.now();
+    clearInterval(progT);
+    progT=setInterval(function(){
+      var p=Math.min(100,(Date.now()-t0)/(S[i].dur||DUR)*100);
+      el.style.setProperty('--p',p+'%');
+      if(p>=100) clearInterval(progT);
+    },60);
+  }
+  function schedule(){
+    clearTimeout(timer); if(!playing) return; tickProgress();
+    timer=setTimeout(function(){
+      if(i<S.length-1){ i++; render(); schedule(); }
+      else if(autoAdv.checked){ i=0; render(); schedule(); }
+      else { setPlay(false); }
+    },S[i].dur||DUR);
+  }
+  function setPlay(on){
+    playing=on; playTxt.textContent=on?'Pause':'Play';
+    playIcon.innerHTML=on?ICON.pause:ICON.play;
+    if(on) schedule(); else { clearTimeout(timer); clearInterval(progT); }
+  }
+  function go(idx){ i=Math.max(0,Math.min(S.length-1,idx)); render(); if(playing) schedule(); }
+
+  document.getElementById('prev').addEventListener('click',function(){ go(i-1) });
+  document.getElementById('next').addEventListener('click',function(){ go(i+1) });
+  playBtn.addEventListener('click',function(){ setPlay(!playing) });
+  document.addEventListener('keydown',function(e){
+    if(e.key===' '){e.preventDefault();setPlay(!playing)}
+    else if(e.key==='ArrowRight')go(i+1);
+    else if(e.key==='ArrowLeft')go(i-1);
+  });
+
+  render();
+})();
+</script>
+</body>
+</html>

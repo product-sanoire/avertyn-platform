@@ -19,7 +19,7 @@ import { GettingStarted } from "./GettingStarted";
 import { WorkspaceSwitcher } from "./WorkspaceSwitcher";
 import Claims from "../dispute/[id]/Claims";
 
-const TABS = ["Overview", "Cases", "Intelligence", "Workspace", "Filing", "Admin", "Payers", "Workbench"];
+const TABS = ["Overview", "Cases", "Intelligence", "Workspace", "Filing", "Admin", "Payers", "Workbench", "NSA 101"];
 const INTEL = [["initiators", "Initiators & IDREs"], ["exposure", "Employer exposure"], ["live", "Live intelligence"]];
 const STAGES = [["all", "All"], ["due", "Due soon"], ["incoming", "Incoming"], ["eligibility", "Eligibility"], ["qpa", "QPA defense"], ["respond", "Respond & pay"]];
 const mkg = { pass: ["pass", "✓"], fail: ["fail", "×"], warn: ["warn", "!"], na: ["na", "–"] };
@@ -471,7 +471,7 @@ export default function Dashboard() {
       </div>
 
       <div className="tabs">
-        {[0, 1, 6, 3, 2, 4, 7, 5].map((i) => <button key={TABS[i]} className={"tab" + (i === tab ? " on" : "")} onClick={() => setTab(i)}>{TABS[i]}</button>)}
+        {[0, 1, 6, 3, 2, 4, 7, 5, 8].map((i) => <button key={TABS[i]} className={"tab" + (i === tab ? " on" : "")} onClick={() => setTab(i)}>{TABS[i]}</button>)}
       </div>
 
       {tab === 0 ? (
@@ -521,6 +521,10 @@ export default function Dashboard() {
       ) : tab === 6 ? (
         <div style={{ flex: 1, overflow: "auto", padding: 22 }}>
           <PayersView orgId={orgId} onErr={setErr} onOpenCase={(id) => { setSel(id); setTab(1); setStage("all"); }} />
+        </div>
+      ) : tab === 8 ? (
+        <div style={{ flex: 1, overflow: "hidden" }}>
+          <iframe src="/idr-101.html" title="IDR 101 — How No Surprises Act IDR works" style={{ width: "100%", height: "100%", border: 0, display: "block" }} />
         </div>
       ) : tab === 7 ? (
         <div style={{ flex: 1, overflow: "auto" }}>
