@@ -10,9 +10,9 @@
 <link href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;0,6..72,600;1,6..72,400;1,6..72,500&family=Inter:wght@400;500;600&family=Space+Grotesk:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
 :root{
-  /* light chrome */
-  --paper:#f4f1ea; --paper-2:#ece7dd; --ink:#181b20; --ink-2:#40454d; --muted:#7a7d84;
-  --line:#e0dacf; --line-2:#d0c9bb; --sig:#b23a2a; --gold:#a9832f;
+  /* light chrome — matched to platform cool porcelain */
+  --paper:#eef0f2; --paper-2:#e5e8ec; --ink:#191b1f; --ink-2:#3a3d44; --muted:#656a72;
+  --line:#dfe3e7; --line-2:#cdd3da; --sig:#b23a20; --gold:#8a7a52;
   /* dark theater (scoped in .player) */
   --bg:#15171c; --bg-2:#1b1e25; --glass:rgba(255,255,255,.045); --glass-2:rgba(255,255,255,.07);
   --hair:rgba(238,232,222,.12); --hair-2:rgba(238,232,222,.2);
@@ -29,7 +29,8 @@ html,body{margin:0}
 body{
   font-family:var(--sans); color:var(--ink); background:var(--paper);
   -webkit-font-smoothing:antialiased; line-height:1.5;
-  background-image:radial-gradient(1100px 460px at 82% -12%, #f7ece7 0%, rgba(247,236,231,0) 60%);
+  background-image:linear-gradient(180deg,#eef0f2,#e5e8ec);
+  background-attachment:fixed;
 }
 .wrap{max-width:1060px;margin:0 auto;padding:26px 20px 44px}
 
@@ -207,7 +208,7 @@ h1{font-family:var(--serif);font-weight:500;font-size:clamp(26px,3.7vw,40px);lin
 
 /* chapter rail below */
 .chaps{display:flex;flex-wrap:wrap;gap:8px;margin-top:18px}
-.chapbtn{border:1px solid var(--line);background:#fffdfa;border-radius:99px;padding:8px 14px;font-size:12.5px;color:var(--ink-2);cursor:pointer;display:flex;align-items:center;gap:8px;transition:.16s}
+.chapbtn{border:1px solid var(--line);background:#fff;border-radius:99px;padding:8px 14px;font-size:12.5px;color:var(--ink-2);cursor:pointer;display:flex;align-items:center;gap:8px;transition:.16s}
 .chapbtn:hover{border-color:var(--ink-2);transform:translateY(-1px)}
 .chapbtn.on{background:var(--ink);color:#fff;border-color:var(--ink)}
 .chapbtn .num{font-family:var(--serif);font-size:13px;font-style:italic;opacity:.85}
