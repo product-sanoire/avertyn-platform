@@ -41,7 +41,7 @@ body{
 .btype{font-family:var(--serif);font-weight:600;font-size:19px;letter-spacing:-.01em}
 .btype i{color:var(--sig);font-style:normal}
 .kicker{font-family:var(--mono);font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--muted);flex:none;white-space:nowrap}
-.mtitle{flex:1;min-width:0;display:flex;flex-direction:column;gap:1px;border-left:1px solid var(--line-2);padding-left:18px}
+.mtitle{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}
 .eyebrow{font-family:var(--mono);font-size:10px;letter-spacing:.2em;text-transform:uppercase;color:var(--sig)}
 .mtitle h1{font-family:var(--serif);font-weight:500;font-size:clamp(16px,1.9vw,22px);line-height:1.05;letter-spacing:-.014em;margin:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 
@@ -71,10 +71,10 @@ body{
 .chaptag .now{color:var(--gold-2)}
 .chaptag b{color:var(--cream);font-weight:600}
 
-.stage{position:relative;z-index:3;flex:1;min-height:0;overflow:auto;padding:14px 30px 18px}
-@media(max-width:720px){.stage{padding:14px 16px 18px}}
+.stage{position:relative;z-index:3;flex:1;min-height:0;overflow:hidden;padding:0}
+@media(max-width:720px){.scene{padding:12px 16px 16px}}
 
-.scene{opacity:0;transition:opacity .55s ease}
+.scene{opacity:0;transition:opacity .55s ease;padding:14px 30px 16px;transform-origin:top center;will-change:transform}
 .scene.show{opacity:1}
 .scene-head{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;flex-wrap:wrap;padding-bottom:8px;border-bottom:1px solid var(--hair)}
 .scene-title{font-family:var(--serif);font-weight:500;font-size:clamp(19px,2.5vw,26px);line-height:1.08;letter-spacing:-.012em;margin:2px 0 0;max-width:20ch;color:var(--cream)}
@@ -224,10 +224,6 @@ body{
 <div class="wrap">
 
   <header class="mast">
-    <div class="brand">
-      <svg class="bmk" viewBox="0 0 512 512" aria-hidden="true"><rect width="512" height="512" rx="112" fill="#181b20"/><g fill="none" stroke="#f4f1ea" stroke-width="44" stroke-linecap="butt" stroke-linejoin="round"><path d="M172 374 L244 196"/><path d="M340 374 L268 196"/></g><circle cx="256" cy="182" r="27" fill="#b23a2a"/></svg>
-      <span class="btype">Avertyn<i>.</i></span>
-    </div>
     <div class="mtitle">
       <span class="eyebrow">The No Surprises Act</span>
       <h1>How federal IDR works — from both sides of the table</h1>
@@ -528,6 +524,13 @@ body{
 
   function icons(html){ return html.replace(/\[\[(\w+)\]\]/g,function(m,k){return ICON[k]||"";}); }
 
+  function fitScene(){
+    var sc=document.getElementById('sc'); if(!sc) return;
+    sc.style.transform='none';
+    var avail=stage.clientHeight, natural=sc.scrollHeight;
+    var s=(avail>0 && natural>avail) ? (avail/natural) : 1;
+    sc.style.transform = s<1 ? ('scale('+s.toFixed(4)+')') : 'none';
+  }
   function render(){
     var s=S[i];
     stage.innerHTML=
@@ -544,6 +547,7 @@ body{
         "</div>"+
       "</div>";
     var sc=document.getElementById('sc'); void sc.offsetWidth; sc.classList.add('show');
+    fitScene(); requestAnimationFrame(fitScene); setTimeout(fitScene,240); setTimeout(fitScene,1250);
     chNow.textContent="Ch. "+(i+1)+" — "+s.key; chIdx.textContent=i+1; count.textContent=(i+1)+" / "+S.length;
     for(var k=0;k<segs.length;k++){
       segs[k].classList.remove('done','active'); segs[k].firstChild.style.width='';
@@ -587,6 +591,8 @@ body{
   });
 
   render();
+  window.addEventListener('resize',fitScene);
+  if(document.fonts&&document.fonts.ready){document.fonts.ready.then(fitScene);}
 })();
 </script>
 </body>
